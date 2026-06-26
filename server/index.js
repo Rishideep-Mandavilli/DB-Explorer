@@ -20,6 +20,10 @@ const io = new Server(http, { cors: { origin: '*' } });
 app.use(cors());
 app.use(express.json());
 
+// Serve static client build in production
+const clientBuildPath = path.join(__dirname, '..', 'client', 'dist');
+app.use(express.static(clientBuildPath));
+
 const engines = {
   sqlite: sqliteEngine,
   level: levelEngine,
@@ -124,13 +128,35 @@ app.get('/api/lessons/:id', (req, res) => {
   res.json(lesson);
 });
 
+// Catch-all: serve client for any non-API route (React Router)
+app.get('*', (req, res) => {
+  res.sendFile(path.join(clientBuildPath, 'index.html'));
+});
+
 io.on('connection', (socket) => {
   console.log('Client connected:', socket.id);
   socket.on('disconnect', () => console.log('Client disconnected:', socket.id));
 });
 
 const PORT = process.env.PORT || 3001;
+
+// Auto-seed databases on first start
+function autoSeed() {
+  try {
+    console.log('Seeding databases...');
+    Object.values(engines).forEach(e => {
+      if (e.reset) e.reset();
+      if (e.seed) e.seed();
+    });
+    console.log('Databases seeded successfully.');
+  } catch (err) {
+    console.error('Seed error:', err.message);
+  }
+}
+autoSeed();
+
 http.listen(PORT, () => {
   console.log(`DB Explorer server running on port ${PORT}`);
   console.log('Engines:', Object.keys(engines).join(', '));
+  console.log(`Client: http://localhost:${PORT}`);
 });

@@ -4,10 +4,13 @@
   "private": true,
   "scripts": {
     "dev": "concurrently \"npm run server\" \"npm run client\"",
+    "start": "node server/index.js",
     "server": "node server/index.js",
     "client": "cd client && npm run dev",
     "setup": "npm install && cd client && npm install",
-    "seed": "node server/seed.js"
+    "build": "cd client && npm install && npm run build",
+    "seed": "node server/seed.js",
+    "postinstall": "cd client && npm install"
   },
   "dependencies": {
     "better-sqlite3": "^11.0.0",
