@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Cloud, Play, Loader2, CheckCircle2, Copy, Code2, Server, Database, Lock, Zap, Globe, ArrowRight } from 'lucide-react';
 import QueryResult from '../components/QueryResult';
+import ServerNotice from '../components/ServerNotice';
 
 const PROVIDER_EDUCATION = {
   supabase: {
@@ -243,8 +244,14 @@ export default function Providers() {
   const [providers, setProviders] = useState([]);
   const [results, setResults] = useState({});
   const [loading, setLoading] = useState(null);
+  const [serverError, setServerError] = useState(false);
 
-  useEffect(() => { fetch('/api/providers').then(r => r.json()).then(setProviders); }, []);
+  useEffect(() => {
+    fetch('/api/providers')
+      .then(r => r.json())
+      .then(setProviders)
+      .catch(() => setServerError(true));
+  }, []);
 
   async function runQuery(provider, operation, params) {
     setLoading(operation);
@@ -263,6 +270,7 @@ export default function Providers() {
 
   return (
     <div className="animate-fade-in">
+      {serverError && <ServerNotice message="Cloud providers require the backend server. Set environment variables and restart the server to connect." />}
       <div className="flex items-center gap-3 mb-1">
         <div className="w-9 h-9 rounded-lg bg-cyan-600 flex items-center justify-center">
           <Cloud className="w-4 h-4 text-white" />

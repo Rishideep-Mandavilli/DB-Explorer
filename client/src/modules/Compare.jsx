@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { GitCompare, Play, Loader2, Lightbulb, Clock, BarChart3, Zap, AlertTriangle, CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import { executeQuery } from '../utils/api';
 import QueryResult from '../components/QueryResult';
+import ServerNotice from '../components/ServerNotice';
 
 const SCENARIOS = [
   {
@@ -124,6 +125,7 @@ export default function Compare() {
   const [loading, setLoading] = useState(null);
   const [showGuide, setShowGuide] = useState(false);
   const [runAll, setRunAll] = useState(false);
+  const [serverError, setServerError] = useState(false);
 
   async function runComparison(scenario) {
     setActiveScenario(scenario);
@@ -134,6 +136,7 @@ export default function Compare() {
         const res = await executeQuery(q.engine, q.operation || q.sql, q.params);
         setResults(prev => ({ ...prev, [q.label]: res }));
       } catch (err) {
+        if (err.message.includes('not available')) setServerError(true);
         setResults(prev => ({ ...prev, [q.label]: { error: err.message } }));
       }
       setLoading(null);
@@ -148,6 +151,7 @@ export default function Compare() {
 
   return (
     <div className="animate-fade-in">
+      {serverError && <ServerNotice message="Compare mode requires the backend server to run queries against multiple database engines." />}
       <div className="flex items-center gap-3 mb-1">
         <div className="w-9 h-9 rounded-lg bg-green-600 flex items-center justify-center">
           <GitCompare className="w-4 h-4 text-white" />

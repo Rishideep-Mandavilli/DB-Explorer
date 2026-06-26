@@ -4,6 +4,7 @@ import { Terminal, Play, Loader2, RotateCcw, Database, Lightbulb, BookOpen, Hist
 import { getEngines, getEngineInfo, getSchema, executeQuery, resetEngine } from '../utils/api';
 import QueryResult from '../components/QueryResult';
 import SchemaViewer from '../components/SchemaViewer';
+import ServerNotice from '../components/ServerNotice';
 
 const ENGINE_INFO = {
   sqlite: {
@@ -106,16 +107,23 @@ export default function Sandbox() {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [resetting, setResetting] = useState(false);
+  const [serverError, setServerError] = useState(false);
   const [history, setHistory] = useState(() => {
     try { return JSON.parse(localStorage.getItem('db-explorer-history') || '[]'); } catch { return []; }
   });
 
-  useEffect(() => { getEngines().then(setEngines); }, []);
+  useEffect(() => {
+    getEngines()
+      .then(setEngines)
+      .catch(() => setServerError(true));
+  }, []);
   useEffect(() => { if (urlEngine) setActiveEngine(urlEngine); }, [urlEngine]);
   useEffect(() => {
     if (!activeEngine) return;
-    Promise.all([getEngineInfo(activeEngine), getSchema(activeEngine)])
-      .then(([i, s]) => { setInfo(i); setSchema(s); });
+    Promise.all([
+      getEngineInfo(activeEngine).catch(() => null),
+      getSchema(activeEngine).catch(() => null),
+    ]).then(([i, s]) => { setInfo(i); setSchema(s); });
     setResults(null); setQuery('');
   }, [activeEngine]);
 
@@ -167,6 +175,7 @@ export default function Sandbox() {
 
   return (
     <div className="animate-fade-in">
+      {serverError && <ServerNotice message="The sandbox requires the backend server to execute queries against real database engines." />}
       <div className="flex items-center gap-3 mb-1">
         <div className={`w-9 h-9 rounded-lg ${engineStyle.color} flex items-center justify-center`}>
           <Terminal className="w-4 h-4 text-white" />

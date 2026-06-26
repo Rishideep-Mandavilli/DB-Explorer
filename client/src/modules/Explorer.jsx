@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Settings, Database, Key, GitBranch, Clock, Cpu, Box, ChevronRight, ChevronDown, Zap, Shield, Gauge, HardDrive, BookOpen, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { getEngines, getSchema } from '../utils/api';
 import SchemaViewer from '../components/SchemaViewer';
+import ServerNotice from '../components/ServerNotice';
 
 const ENGINE_DETAILS = {
   sqlite: {
@@ -162,15 +163,18 @@ export default function Explorer() {
   const [schemas, setSchemas] = useState({});
   const [showTechnical, setShowTechnical] = useState(true);
   const [showAccess, setShowAccess] = useState(false);
+  const [serverError, setServerError] = useState(false);
 
   useEffect(() => {
-    getEngines().then(async e => {
-      setEngines(e);
-      setActiveEngine(e[0]);
-      const s = {};
-      for (const eng of e) { s[eng] = await getSchema(eng); }
-      setSchemas(s);
-    });
+    getEngines()
+      .then(async e => {
+        setEngines(e);
+        setActiveEngine(e[0]);
+        const s = {};
+        for (const eng of e) { s[eng] = await getSchema(eng).catch(() => null); }
+        setSchemas(s);
+      })
+      .catch(() => setServerError(true));
   }, []);
 
   const detail = ENGINE_DETAILS[activeEngine] || {};
@@ -178,6 +182,7 @@ export default function Explorer() {
 
   return (
     <div className="animate-fade-in">
+      {serverError && <ServerNotice message="Schema Explorer requires the backend server to load database schemas and structures." />}
       <div className="flex items-center gap-3 mb-1">
         <div className="w-9 h-9 rounded-lg bg-indigo-600 flex items-center justify-center">
           <Settings className="w-4 h-4 text-white" />
