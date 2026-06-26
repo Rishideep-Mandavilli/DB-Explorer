@@ -6,43 +6,65 @@ A hands-on application for understanding databases through real queries, visual 
 
 ```bash
 cd db-explorer
-npm run setup    # Install dependencies
-npm run seed     # Seed sample data
-npm run dev      # Start server + client
+npm run setup    # Install all dependencies
+npm run seed     # Seed all 6 databases with sample data
+npm run dev      # Start server (3001) + client (5173)
 ```
 
-Open http://localhost:5173
+Open **http://localhost:5173** in your browser.
+
+### Prerequisites
+
+- Node.js 18+ (recommended: 20+)
+- npm 9+
+- No database installation required — all engines run embedded
 
 ## What's Inside
 
-### 5 Database Engines (run locally)
-- **SQLite** — Relational: SQL, JOINs, indexes, ACID
-- **LevelDB** — Key-value: O(1) lookups, LSM-trees
-- **Graph DB** — Neo4j-style: BFS, shortest path, traversal
-- **Time-Series** — InfluxDB-style: range queries, downsampling, aggregation
-- **Vector DB** — Embedding search: cosine similarity, semantic search
+### 6 Database Engines (run locally)
+
+| Engine | Type | What It Teaches |
+|--------|------|-----------------|
+| **SQLite** | Relational | SQL: SELECT, JOINs, GROUP BY, window functions, CTEs |
+| **LevelDB** | Key-Value | LSM-trees, prefix scans, get/put/del, batch operations |
+| **Graph DB** | Property Graph | BFS/DFS, shortest path, Cypher-style traversal |
+| **Time-Series** | Metrics | Range queries, downsampling, aggregations, tags |
+| **Vector** | Embeddings | Cosine similarity, semantic search, HNSW indexes |
+| **MongoDB** | Document | Aggregation pipeline, nested queries, flexible schema |
 
 ### 2 Cloud Providers (demo mode, activate with env vars)
-- **Supabase** — PostgreSQL + REST API + real-time
-- **Firebase Firestore** — Document DB + real-time sync
+- **Supabase** — PostgreSQL + REST API + real-time subscriptions
+- **Firebase Firestore** — Document DB + real-time sync + offline support
 
-### 8 Interactive Lessons
-1. What is a Database?
-2. Relational Databases & SQL
-3. Key-Value Stores
-4. Graph Databases
-5. Time-Series Databases
-6. Vector Databases & AI
-7. CAP Theorem
-8. Database Comparison
+### 30 Interactive Lessons (232 concepts)
+
+| Category | Lessons |
+|----------|---------|
+| Foundations | What is a Database?, Relational & SQL, Key-Value, Graph, Time-Series, Vector, CAP Theorem, Comparison |
+| Query Languages | SQL Deep Dive, MongoDB, Cypher, InfluxQL/PromQL, Redis Patterns |
+| Design & Performance | Database Design, Indexing, NoSQL Modeling, Distributed Systems, Comparison Matrix |
+| Advanced | Transactions, PostgreSQL, MySQL, MongoDB Advanced, Cassandra |
+| Search & Cloud | Elasticsearch, DynamoDB, Data Warehousing |
+| Operations | Security, Backup/Recovery, Migrations, Real-World Architecture |
+
+### Application Sections
+
+| Section | What It Does |
+|---------|-------------|
+| **Lessons** | 30 structured tutorials with search, progress tracking, concept filtering |
+| **Sandbox** | Free-form query editor, preset queries, query history, 6 engine selector |
+| **Compare** | 10 side-by-side scenarios with timing, decision guides, Run All |
+| **Schema Explorer** | Per-engine details: storage, access patterns (Big-O), indexes, when to use/avoid |
+| **Cloud** | Supabase + Firestore: full API code, architecture diagrams, setup instructions |
 
 ### Features
-- **Query Sandbox** — Write and run queries against any engine
-- **Compare Mode** — Same problem, different databases side-by-side
-- **Schema Explorer** — See how data is structured in each type
-- **Graph Visualizer** — Interactive node-edge diagrams
-- **Time-Series Charts** — Visualize metric trends
-- **CAP Theorem Explorer** — Interactive triangle diagram
+
+- Query Sandbox with preset queries and history
+- Side-by-side database comparisons with performance timing
+- Schema Explorer with access patterns and complexity analysis
+- Progress tracking (localStorage) and search
+- Solid-color UI, no gradients
+- All queries run against real embedded engines
 
 ## Cloud Provider Setup
 
@@ -59,6 +81,31 @@ export FIREBASE_SERVICE_ACCOUNT='{"type":"service_account",...}'
 ```
 
 ## Tech Stack
-- Backend: Express, SQLite (better-sqlite3), LevelDB
-- Frontend: React, Vite, Tailwind CSS, Recharts
-- Real-time: Socket.io
+
+| Component | Technology |
+|-----------|-----------|
+| Backend | Node.js, Express, better-sqlite3, level, Socket.io |
+| Frontend | React 18, Vite 5, Tailwind CSS 3, Recharts, React Router 6 |
+| Cloud | @supabase/supabase-js, firebase-admin |
+
+## Project Structure
+
+```
+db-explorer/
+├── server/
+│   ├── index.js              # Express server + API routes
+│   ├── lessons.js            # 30 lessons (3100+ lines of content)
+│   ├── seed.js               # Seed all databases
+│   └── engines/              # 6 engines + 2 cloud providers
+├── client/
+│   └── src/
+│       ├── modules/          # 6 page components
+│       ├── components/       # 6 reusable components
+│       └── utils/            # API client
+├── ABOUT.md                  # Full project documentary
+└── README.md                 # This file
+```
+
+## License
+
+Educational use. Built for learning databases.
