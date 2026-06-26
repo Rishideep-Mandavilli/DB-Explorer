@@ -46,7 +46,20 @@ export default function Lessons() {
     try { return JSON.parse(localStorage.getItem('db-explorer-completed') || '{}'); } catch { return {}; }
   });
 
-  useEffect(() => { getLessons().then(l => { setLessons(l); setLoading(false); }); }, []);
+  useEffect(() => {
+    getLessons()
+      .then(l => { setLessons(l); setLoading(false); })
+      .catch(() => {
+        // Fallback: load lessons from embedded data when backend is unavailable
+        import('../data/lessons.js').then(m => {
+          setLessons(m.default || m.lessons || []);
+          setLoading(false);
+        }).catch(() => {
+          setLessons([]);
+          setLoading(false);
+        });
+      });
+  }, []);
 
   const filtered = lessons.filter(l => {
     const matchCategory = filter === 'all' || l.category === filter;

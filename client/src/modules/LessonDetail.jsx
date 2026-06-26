@@ -144,7 +144,18 @@ export default function LessonDetail() {
     try { return JSON.parse(localStorage.getItem('db-explorer-completed') || '{}'); } catch { return {}; }
   });
 
-  useEffect(() => { getLesson(id).then(l => { setLesson(l); setLoading(false); }); }, [id]);
+  useEffect(() => {
+    getLesson(id)
+      .then(l => { setLesson(l); setLoading(false); })
+      .catch(() => {
+        import('../data/lessons.js').then(m => {
+          const all = m.default || m.lessons || [];
+          const found = all.find(l => l.id === id);
+          if (found) { setLesson(found); } else { setLesson(null); }
+          setLoading(false);
+        }).catch(() => { setLesson(null); setLoading(false); });
+      });
+  }, [id]);
 
   async function runDemoQuery(q) {
     const key = q.label || 'custom';
@@ -177,7 +188,7 @@ export default function LessonDetail() {
   );
   if (!lesson) return <div className="text-center py-20 text-gray-500">Lesson not found</div>;
 
-  const demo = lesson.demo;
+  const demo = lesson.demo || null;
 
   function markComplete() {
     const next = { ...completed, [lesson.id]: !completed[lesson.id] };
@@ -425,8 +436,16 @@ export default function LessonDetail() {
         </div>
       )}
 
-      {demo.type === 'cap_explorer' && <CapExplorer data={demo} />}
-      {demo.type === 'comparison' && <ComparisonView data={demo} />}
+      {demo && demo.type === 'cap_explorer' && <CapExplorer data={demo} />}
+      {demo && demo.type === 'comparison' && <ComparisonView data={demo} />}
+
+      {!demo && (
+        <div className="card">
+          <p className="text-gray-400 text-sm">
+            This lesson's educational content is displayed above. Runnable queries require the backend server to be running.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
