@@ -1,22 +1,15 @@
 const API = '/api';
 
 export async function fetchJSON(url, opts = {}) {
-  try {
-    const res = await fetch(`${API}${url}`, {
-      headers: { 'Content-Type': 'application/json' },
-      ...opts,
-    });
-    if (!res.ok) {
-      const err = await res.json().catch(() => ({ error: res.statusText }));
-      throw new Error(err.error || `Request failed (${res.status})`);
-    }
-    return res.json();
-  } catch (err) {
-    if (err.name === 'TypeError' && err.message.includes('fetch')) {
-      throw new Error('Backend server not available. Start the server with: npm run dev');
-    }
-    throw err;
+  const res = await fetch(`${API}${url}`, {
+    headers: { 'Content-Type': 'application/json' },
+    ...opts,
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error(err.error || 'Request failed');
   }
+  return res.json();
 }
 
 export async function getEngines() {

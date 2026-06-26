@@ -49,16 +49,7 @@ export default function Lessons() {
   useEffect(() => {
     getLessons()
       .then(l => { setLessons(l); setLoading(false); })
-      .catch(() => {
-        // Fallback: load lessons from embedded data when backend is unavailable
-        import('../data/lessons.js').then(m => {
-          setLessons(m.default || m.lessons || []);
-          setLoading(false);
-        }).catch(() => {
-          setLessons([]);
-          setLoading(false);
-        });
-      });
+      .catch(() => { setLessons([]); setLoading(false); });
   }, []);
 
   const filtered = lessons.filter(l => {

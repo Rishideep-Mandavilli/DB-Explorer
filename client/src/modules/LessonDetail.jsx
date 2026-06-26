@@ -147,14 +147,7 @@ export default function LessonDetail() {
   useEffect(() => {
     getLesson(id)
       .then(l => { setLesson(l); setLoading(false); })
-      .catch(() => {
-        import('../data/lessons.js').then(m => {
-          const all = m.default || m.lessons || [];
-          const found = all.find(l => l.id === id);
-          if (found) { setLesson(found); } else { setLesson(null); }
-          setLoading(false);
-        }).catch(() => { setLesson(null); setLoading(false); });
-      });
+      .catch(() => { setLesson(null); setLoading(false); });
   }, [id]);
 
   async function runDemoQuery(q) {
@@ -438,14 +431,7 @@ export default function LessonDetail() {
 
       {demo && demo.type === 'cap_explorer' && <CapExplorer data={demo} />}
       {demo && demo.type === 'comparison' && <ComparisonView data={demo} />}
-
-      {!demo && (
-        <div className="card">
-          <p className="text-gray-400 text-sm">
-            This lesson's educational content is displayed above. Runnable queries require the backend server to be running.
-          </p>
-        </div>
-      )}
     </div>
   );
 }
+
