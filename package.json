@@ -8,7 +8,8 @@
     "server": "node server/index.js",
     "client": "cd client && npm run dev",
     "setup": "npm install && cd client && npm install",
-    "seed": "node server/seed.js"
+    "seed": "node server/seed.js",
+    "test:tutor": "node server/test/tutor.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.0",
