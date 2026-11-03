@@ -2,5 +2,8 @@ node_modules/
 server/data/
 client/dist/
 .env
+.env.*
+!.env.example
 *.db
 .DS_Store
+.superpowers/
