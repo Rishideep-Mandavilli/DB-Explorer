@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { ArrowLeft, Play, Loader2, Lightbulb, Code2, ChevronDown, ChevronRight, Copy, Check, BookOpen, CheckCircle2 } from 'lucide-react';
+import { ArrowLeft, Play, Loader2, Lightbulb, Code2, ChevronDown, ChevronRight, Copy, Check, BookOpen, CheckCircle2, Sparkles } from 'lucide-react';
 import { getLesson, executeQuery } from '../utils/api';
 import QueryResult from '../components/QueryResult';
 import GraphVisualizer from '../components/GraphVisualizer';
 import TimeSeriesChart from '../components/TimeSeriesChart';
 import CapExplorer from '../components/CapExplorer';
 import ComparisonView from '../components/ComparisonView';
+import TutorPanel from '../components/TutorPanel';
 
 function CopyButton({ text }) {
   const [copied, setCopied] = useState(false);
@@ -143,6 +144,7 @@ export default function LessonDetail() {
   const [completed, setCompleted] = useState(() => {
     try { return JSON.parse(localStorage.getItem('db-explorer-completed') || '{}'); } catch { return {}; }
   });
+  const [tutorOpen, setTutorOpen] = useState(false);
 
   useEffect(() => {
     getLesson(id)
@@ -210,6 +212,13 @@ export default function LessonDetail() {
           >
             <CheckCircle2 className="w-3.5 h-3.5" />
             {isDone ? 'Completed' : 'Mark complete'}
+          </button>
+          <button
+            onClick={() => setTutorOpen(true)}
+            className="flex items-center gap-1.5 text-xs px-3 py-1 rounded-lg bg-gradient-to-r from-purple-600/30 to-blue-600/30 text-purple-300 border border-purple-500/40 hover:border-purple-400 transition-all shadow-sm"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <span>AI Tutor</span>
           </button>
         </div>
         <h1 className="text-2xl sm:text-3xl font-bold text-white mb-3">{lesson.title}</h1>
@@ -431,6 +440,29 @@ export default function LessonDetail() {
 
       {demo && demo.type === 'cap_explorer' && <CapExplorer data={demo} />}
       {demo && demo.type === 'comparison' && <ComparisonView data={demo} />}
+
+      {/* Floating Ask AI Tutor Button */}
+      <button
+        onClick={() => setTutorOpen(prev => !prev)}
+        className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium text-xs shadow-xl transition-all hover:scale-105 border border-purple-400/40"
+      >
+        <Sparkles className="w-4 h-4 text-purple-200" />
+        <span>Ask AI Tutor</span>
+      </button>
+
+      {/* Embedded Otari AI Tutor Side Panel */}
+      <TutorPanel
+        isOpen={tutorOpen}
+        onClose={() => setTutorOpen(false)}
+        context={{
+          engine: lesson.engine,
+          lessonId: lesson.id,
+          lessonTitle: lesson.title,
+          currentSql: customQuery || (lesson.queries && lesson.queries[0]?.sql),
+          solutionSql: lesson.queries && lesson.queries[0]?.sql,
+        }}
+        onApplySql={(sql) => setCustomQuery(sql)}
+      />
     </div>
   );
 }

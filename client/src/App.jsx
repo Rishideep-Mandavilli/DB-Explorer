@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Database, BookOpen, Terminal, GitCompare, Settings, Cloud, Menu, X, GraduationCap } from 'lucide-react';
+import { Database, BookOpen, Terminal, GitCompare, Settings, Cloud, Menu, X, GraduationCap, Sparkles } from 'lucide-react';
 import Lessons from './modules/Lessons';
 import Sandbox from './modules/Sandbox';
 import Compare from './modules/Compare';
 import Explorer from './modules/Explorer';
 import Providers from './modules/Providers';
 import LessonDetail from './modules/LessonDetail';
+import TutorPanel from './components/TutorPanel';
 
 const NAV = [
   { to: '/', label: 'Lessons', icon: BookOpen },
@@ -16,7 +17,7 @@ const NAV = [
   { to: '/providers', label: 'Cloud', icon: Cloud },
 ];
 
-function Nav() {
+function Nav({ onOpenTutor }) {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
 
@@ -33,7 +34,7 @@ function Nav() {
           </div>
         </Link>
 
-        <div className="hidden lg:flex items-center gap-0.5">
+        <div className="hidden lg:flex items-center gap-1">
           {NAV.map(({ to, label, icon: Icon }) => {
             const isActive = location.pathname === to || (to !== '/' && location.pathname.startsWith(to));
             return (
@@ -51,6 +52,18 @@ function Nav() {
               </Link>
             );
           })}
+
+          <button
+            onClick={onOpenTutor}
+            className="flex items-center gap-1.5 ml-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600/20 to-blue-600/20 text-purple-300 border border-purple-500/30 hover:border-purple-400 text-xs font-semibold transition-all hover:scale-105"
+            title="Open DB Explorer AI Tutor powered by Mozilla Otari"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <span>AI Tutor</span>
+            <span className="text-[9px] uppercase px-1 py-0.2 bg-purple-900/60 rounded text-purple-300 border border-purple-700/50">
+              Otari
+            </span>
+          </button>
         </div>
 
         <button onClick={() => setMobileOpen(!mobileOpen)} className="lg:hidden p-2 rounded-lg hover:bg-gray-800">
@@ -59,7 +72,7 @@ function Nav() {
       </div>
 
       {mobileOpen && (
-        <div className="lg:hidden border-t border-gray-800 bg-gray-950 px-4 py-2">
+        <div className="lg:hidden border-t border-gray-800 bg-gray-950 px-4 py-2 space-y-1">
           {NAV.map(({ to, label, icon: Icon }) => (
             <Link
               key={to}
@@ -73,6 +86,16 @@ function Nav() {
               {label}
             </Link>
           ))}
+          <button
+            onClick={() => {
+              setMobileOpen(false);
+              onOpenTutor();
+            }}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm text-purple-300 bg-purple-950/40 border border-purple-800/40"
+          >
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span>AI Tutor (Otari)</span>
+          </button>
         </div>
       )}
     </nav>
@@ -102,10 +125,12 @@ function Footer() {
 }
 
 export default function App() {
+  const [globalTutorOpen, setGlobalTutorOpen] = useState(false);
+
   return (
     <BrowserRouter>
       <div className="min-h-screen flex flex-col">
-        <Nav />
+        <Nav onOpenTutor={() => setGlobalTutorOpen(prev => !prev)} />
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8">
           <Routes>
             <Route path="/" element={<Lessons />} />
@@ -118,6 +143,11 @@ export default function App() {
           </Routes>
         </main>
         <Footer />
+        <TutorPanel
+          isOpen={globalTutorOpen}
+          onClose={() => setGlobalTutorOpen(false)}
+          context={{ engine: 'sqlite' }}
+        />
       </div>
     </BrowserRouter>
   );

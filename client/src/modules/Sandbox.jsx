@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Terminal, Play, Loader2, RotateCcw, Database, Lightbulb, BookOpen, History, X } from 'lucide-react';
+import { Terminal, Play, Loader2, RotateCcw, Database, Lightbulb, BookOpen, History, X, Sparkles } from 'lucide-react';
 import { getEngines, getEngineInfo, getSchema, executeQuery, resetEngine } from '../utils/api';
 import QueryResult from '../components/QueryResult';
 import SchemaViewer from '../components/SchemaViewer';
+import TutorPanel from '../components/TutorPanel';
 
 const ENGINE_INFO = {
   sqlite: {
@@ -109,6 +110,7 @@ export default function Sandbox() {
   const [history, setHistory] = useState(() => {
     try { return JSON.parse(localStorage.getItem('db-explorer-history') || '[]'); } catch { return []; }
   });
+  const [tutorOpen, setTutorOpen] = useState(false);
 
   useEffect(() => {
     getEngines()
@@ -173,13 +175,24 @@ export default function Sandbox() {
 
   return (
     <div className="animate-fade-in">
-      <div className="flex items-center gap-3 mb-1">
-        <div className={`w-9 h-9 rounded-lg ${engineStyle.color} flex items-center justify-center`}>
-          <Terminal className="w-4 h-4 text-white" />
+      <div className="flex items-center justify-between mb-1">
+        <div className="flex items-center gap-3">
+          <div className={`w-9 h-9 rounded-lg ${engineStyle.color} flex items-center justify-center`}>
+            <Terminal className="w-4 h-4 text-white" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Query Sandbox</h1>
+            <p className="text-gray-500 text-xs">Write and run queries against any database engine.</p>
+          </div>
         </div>
-        <h1 className="text-2xl font-bold text-white">Query Sandbox</h1>
+        <button
+          onClick={() => setTutorOpen(true)}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-600/30 to-blue-600/30 text-purple-300 border border-purple-500/40 hover:border-purple-400 text-xs font-medium transition-all shadow-sm"
+        >
+          <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+          <span>AI Tutor (Otari)</span>
+        </button>
       </div>
-      <p className="text-gray-500 text-sm mb-6 ml-[48px]">Write and run queries against any database engine.</p>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-5">
         {/* Sidebar */}
@@ -293,10 +306,21 @@ export default function Sandbox() {
             />
             <div className="flex items-center justify-between mt-3">
               <span className="text-[11px] text-gray-600">Ctrl+Enter to run</span>
-              <button onClick={runQuery} disabled={loading} className="btn-primary flex items-center gap-2">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                Run Query
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTutorOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gray-800 hover:bg-gray-700 text-purple-300 border border-purple-500/30 text-sm font-medium transition-colors"
+                  title="Ask AI Tutor to check or optimize this query"
+                >
+                  <Sparkles className="w-4 h-4 text-purple-400" />
+                  <span>Ask Tutor</span>
+                </button>
+                <button onClick={runQuery} disabled={loading} className="btn-primary flex items-center gap-2">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                  Run Query
+                </button>
+              </div>
             </div>
           </div>
 
@@ -309,6 +333,27 @@ export default function Sandbox() {
           )}
         </div>
       </div>
+
+      {/* Floating Ask AI Tutor Button */}
+      <button
+        onClick={() => setTutorOpen(prev => !prev)}
+        className="fixed bottom-6 right-6 z-30 flex items-center gap-2 px-4 py-2.5 rounded-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white font-medium text-xs shadow-xl transition-all hover:scale-105 border border-purple-400/40"
+      >
+        <Sparkles className="w-4 h-4 text-purple-200" />
+        <span>Ask AI Tutor</span>
+      </button>
+
+      {/* Embedded Otari AI Tutor Side Panel */}
+      <TutorPanel
+        isOpen={tutorOpen}
+        onClose={() => setTutorOpen(false)}
+        context={{
+          engine: activeEngine,
+          currentSql: query,
+          schema: schema,
+        }}
+        onApplySql={(sql) => setQuery(sql)}
+      />
     </div>
   );
 }
