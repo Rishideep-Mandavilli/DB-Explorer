@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const { isOtariConfigured, OTARI_BASE_URL, MODELS } = require('./otariClient');
 const { handleTutorChat, handleCheckAnswer } = require('./tutor');
+const { getUserBudget, recordUsage, resetUserBudget, DAILY_BUDGET_USD } = require('./budget');
+const { MCP_TOOLS, handleMcpToolCall } = require('./mcp');
 
 // Health and gateway status check
 router.get('/health', (req, res) => {
@@ -13,6 +15,10 @@ router.get('/health', (req, res) => {
       explainer: MODELS.EXPLAINER,
       coderPolicy: MODELS.CODER_POLICY,
       coderFallback: MODELS.CODER_FALLBACK,
+    },
+    spendingCeiling: {
+      workspaceDailyCapUsd: 10.0,
+      userDailyBudgetUsd: DAILY_BUDGET_USD,
     },
   });
 });
@@ -36,13 +42,45 @@ router.get('/models', (req, res) => {
   });
 });
 
+// Per-User Budget Meter & Status
+router.get('/budget', async (req, res) => {
+  try {
+    const userId = req.query.user || 'anonymous-learner';
+    const forceExhaust = req.query.exhaust === 'true';
+    const budgetInfo = await getUserBudget(userId, forceExhaust);
+    res.json(budgetInfo);
+  } catch (error) {
+    console.error('Budget error:', error);
+    res.status(500).json({ error: 'Failed to retrieve user budget' });
+  }
+});
+
+// Reset user budget (for demo & testing purposes)
+router.post('/budget/reset', async (req, res) => {
+  const userId = req.body.user || req.query.user || 'anonymous-learner';
+  const resetInfo = resetUserBudget(userId);
+  res.json({ ok: true, budget: resetInfo });
+});
+
 // Main chat route for interactive AI tutor
 router.post('/chat', async (req, res) => {
   try {
-    const { message, context, user, modelOverride, simulateFallback } = req.body;
+    const { message, context, user = 'anonymous-learner', modelOverride, simulateFallback, exhaustBudget } = req.body;
 
     if (!message) {
       return res.status(400).json({ error: 'Message is required' });
+    }
+
+    // 1. Enforce Per-Learner Budget Cap ($0.05/day)
+    const userBudget = await getUserBudget(user, Boolean(exhaustBudget));
+    if (userBudget.isExceeded) {
+      return res.status(403).json({
+        error: 'Daily tutor credit limit exceeded ($0.05/learner/day). Your credit will reset at midnight UTC.',
+        budgetExceeded: true,
+        resetTime: userBudget.resetTime,
+        retryAfter: userBudget.retryAfterSeconds || 86400,
+        budget: userBudget,
+      });
     }
 
     const result = await handleTutorChat({
@@ -52,6 +90,9 @@ router.post('/chat', async (req, res) => {
       modelOverride,
       simulateFallback: Boolean(simulateFallback),
     });
+
+    // Record usage for learner
+    recordUsage(user, 0.002);
 
     res.json(result);
   } catch (error) {
@@ -68,7 +109,7 @@ router.post('/chat', async (req, res) => {
 // Specialized grading route with otari_code_execution
 router.post('/check-answer', async (req, res) => {
   try {
-    const { userSql, solutionSql, lessonId, user } = req.body;
+    const { userSql, solutionSql, lessonId, user = 'anonymous-learner' } = req.body;
 
     if (!userSql) {
       return res.status(400).json({ error: 'userSql is required' });
@@ -81,10 +122,27 @@ router.post('/check-answer', async (req, res) => {
       user,
     });
 
+    recordUsage(user, 0.001);
+
     res.json(result);
   } catch (error) {
     console.error('Check Answer Error:', error);
     res.status(500).json({ error: error.message || 'Check answer verification failed' });
+  }
+});
+
+// MCP integration routes (Backup Feature #8)
+router.get('/mcp/tools', (req, res) => {
+  res.json({ tools: MCP_TOOLS });
+});
+
+router.post('/mcp/call', async (req, res) => {
+  const { name, arguments: toolArgs } = req.body;
+  try {
+    const result = await handleMcpToolCall(name, toolArgs);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 
