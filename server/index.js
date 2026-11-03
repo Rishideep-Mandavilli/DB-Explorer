@@ -1,8 +1,10 @@
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const path = require('path');
+const tutorRoutes = require('./ai/routes');
 
 const sqliteEngine = require('./engines/sqlite');
 const levelEngine = require('./engines/level');
@@ -19,6 +21,7 @@ const io = new Server(http, { cors: { origin: '*' } });
 
 app.use(cors());
 app.use(express.json());
+app.use('/api/tutor', tutorRoutes);
 
 const engines = {
   sqlite: sqliteEngine,
