@@ -1,5 +1,5 @@
-import React from 'react';
-import { Bug, X, ShieldAlert, Cpu, Activity, User, Server, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Bug, X, ShieldAlert, Cpu, Activity, User, Server, RefreshCw, Check } from 'lucide-react';
 import { getLearnerId, resetLearnerId } from '../utils/tutorApi';
 
 export default function TutorDebugDrawer({
@@ -10,15 +10,26 @@ export default function TutorDebugDrawer({
   setForceFallback,
   onTriggerDemoFlow,
 }) {
+  const [learnerId, setLearnerId] = useState(() => getLearnerId());
+  const [idResetNotice, setIdResetNotice] = useState(false);
+
   if (!isOpen) return null;
 
-  const learnerId = getLearnerId();
-  const isFallback = latestHeaders['otari-fallback'] === 'true' || forceFallback;
-  const attempts = latestHeaders['otari-attempt-count'] || (isFallback ? '2' : '1');
-  const currentModel = latestHeaders['otari-model'] || (isFallback ? 'qwen/qwen-2.5-coder-32b-instruct (backup)' : 'tutor-sql (primary)');
+  const isFallback = forceFallback || latestHeaders['otari-fallback'] === 'true';
+  const attempts = forceFallback ? '2' : (latestHeaders['otari-attempt-count'] || '1');
+  const currentModel = forceFallback
+    ? 'qwen/qwen-2.5-coder-32b-instruct (backup)'
+    : (latestHeaders['otari-model'] || 'tutor-sql (primary)');
+
+  function handleResetId() {
+    const newId = resetLearnerId();
+    setLearnerId(newId);
+    setIdResetNotice(true);
+    setTimeout(() => setIdResetNotice(false), 2000);
+  }
 
   return (
-    <div className="fixed inset-y-0 right-0 w-80 bg-gray-950 border-l border-gray-800 shadow-2xl z-50 flex flex-col text-xs font-mono">
+    <div className="fixed inset-y-0 right-0 w-80 max-w-[calc(100vw-2rem)] bg-gray-950 border-l border-gray-800 shadow-2xl z-50 flex flex-col text-xs font-mono">
       <div className="p-3.5 border-b border-gray-800 flex items-center justify-between bg-gray-900/60">
         <div className="flex items-center gap-2 text-white font-semibold">
           <Bug className="w-4 h-4 text-amber-400" />
@@ -82,10 +93,20 @@ export default function TutorDebugDrawer({
 
         {/* Learner Identity & Budgets (Hackathon Feature #6) */}
         <div className="space-y-1">
-          <span className="text-gray-400 text-[11px] flex items-center gap-1">
-            <User className="w-3.5 h-3.5 text-sky-400" />
-            Learner (user field)
-          </span>
+          <div className="flex items-center justify-between">
+            <span className="text-gray-400 text-[11px] flex items-center gap-1">
+              <User className="w-3.5 h-3.5 text-sky-400" />
+              Learner (user field)
+            </span>
+            <button
+              onClick={handleResetId}
+              className="text-[10px] text-sky-400 hover:text-sky-300 flex items-center gap-1"
+              title="Generate new anonymous learner ID"
+            >
+              {idResetNotice ? <Check className="w-3 h-3 text-emerald-400" /> : <RefreshCw className="w-3 h-3" />}
+              <span>{idResetNotice ? 'Reset!' : 'New ID'}</span>
+            </button>
+          </div>
           <div className="bg-gray-900 p-2 rounded border border-gray-800 space-y-1">
             <div className="text-gray-300 truncate select-all">{learnerId}</div>
             <div className="text-[10px] text-gray-500">

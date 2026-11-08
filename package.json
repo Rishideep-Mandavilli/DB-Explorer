@@ -7,6 +7,8 @@
     "start": "node server/index.js",
     "server": "node server/index.js",
     "client": "cd client && npm run dev",
+    "build": "cd client && npm run build",
+    "test": "node server/test/tutor.test.js",
     "setup": "npm install && cd client && npm install",
     "seed": "node server/seed.js",
     "test:tutor": "node server/test/tutor.test.js"

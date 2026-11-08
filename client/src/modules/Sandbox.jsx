@@ -100,6 +100,7 @@ export default function Sandbox() {
   const { engine: urlEngine } = useParams();
   const navigate = useNavigate();
   const [engines, setEngines] = useState([]);
+  const [serverError, setServerError] = useState(false);
   const [activeEngine, setActiveEngine] = useState(urlEngine || 'sqlite');
   const [info, setInfo] = useState(null);
   const [schema, setSchema] = useState(null);
@@ -111,6 +112,12 @@ export default function Sandbox() {
     try { return JSON.parse(localStorage.getItem('db-explorer-history') || '[]'); } catch { return []; }
   });
   const [tutorOpen, setTutorOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setTutorOpen(prev => !prev);
+    window.addEventListener('toggle-tutor', handler);
+    return () => window.removeEventListener('toggle-tutor', handler);
+  }, []);
 
   useEffect(() => {
     getEngines()

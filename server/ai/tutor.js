@@ -16,7 +16,7 @@ const sqliteEngine = require('../engines/sqlite');
  * @returns {'explain' | 'sql_coder' | 'check_answer'}
  */
 function detectIntent(message = '', context = {}) {
-  const text = message.toLowerCase().trim();
+  const text = (typeof message === 'string' ? message : String(message || '')).toLowerCase().trim();
 
   if (context.isCheckAnswer || /check\s+(my\s+)?answer|grade\s+(my\s+)?(query|solution)|verify\s+solution/i.test(text)) {
     return 'check_answer';
@@ -158,12 +158,12 @@ Style:
         latencyMs: Date.now() - startTime,
       };
     } catch (err) {
-      console.warn('Otari Gateway request failed, evaluating fallback:', err.message);
-      // If error is budget exceeded, bubble up immediately
-      if (err.status === 403 || err.message?.includes('budget_exceeded')) {
+      console.warn('Otari Gateway request failed:', err.message);
+      // Propagate critical rate limit, auth, and gateway errors
+      if (err.status === 429 || err.status === 403 || err.status === 401 || (err.status >= 500 && !simulateFallback)) {
         throw err;
       }
-      // Otherwise proceed to high-fidelity simulation fallback
+      // Otherwise proceed to high-fidelity simulation fallback for network/offline dev
     }
   }
 
@@ -177,6 +177,39 @@ Style:
     simulateFallback,
     startTime,
   });
+}
+
+/**
+ * Normalizes an individual row object for deterministic comparison
+ */
+function normalizeRow(row) {
+  if (!row || typeof row !== 'object') return row;
+  const sorted = {};
+  Object.keys(row).sort().forEach(k => {
+    let v = row[k];
+    if (typeof v === 'bigint') v = v.toString();
+    else if (typeof v === 'number') v = Math.round(v * 10000) / 10000;
+    sorted[k] = v;
+  });
+  return sorted;
+}
+
+/**
+ * Deterministically compares two SQL result sets
+ */
+function compareResultSets(userRows, solutionRows) {
+  if (!Array.isArray(userRows) || !Array.isArray(solutionRows)) return false;
+  if (userRows.length !== solutionRows.length) return false;
+  const uNorm = userRows.map(normalizeRow);
+  const sNorm = solutionRows.map(normalizeRow);
+
+  // 1. Strict ordered match
+  if (JSON.stringify(uNorm) === JSON.stringify(sNorm)) return true;
+
+  // 2. Unordered match (when query doesn't enforce strict ordering)
+  const uSorted = [...uNorm].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  const sSorted = [...sNorm].sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  return JSON.stringify(uSorted) === JSON.stringify(sSorted);
 }
 
 /**
@@ -197,6 +230,19 @@ async function handleCheckAnswer({
       success: false,
       guardrailBlocked: true,
       feedback: `Safety Violation: ${guardrailCheck.reason}`,
+      model: 'otari-guardrails-engine',
+      passed: false,
+      toolCalls: [],
+    };
+  }
+
+  // Ensure query is read-only (SELECT / WITH / EXPLAIN) in educational grading
+  const normalizedSql = (userSql || '').replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--.*$/gm, ' ').trim().toUpperCase();
+  if (!normalizedSql.startsWith('SELECT') && !normalizedSql.startsWith('WITH') && !normalizedSql.startsWith('EXPLAIN')) {
+    return {
+      success: false,
+      guardrailBlocked: true,
+      feedback: 'Safety Violation: Educational sandbox query evaluation only permits read-only SELECT or WITH statements.',
       model: 'otari-guardrails-engine',
       passed: false,
       toolCalls: [],
@@ -228,9 +274,7 @@ async function handleCheckAnswer({
   const solutionRows = solutionResult?.rows || solutionResult || [];
   const userRowCount = Array.isArray(userRows) ? userRows.length : 0;
   const solutionRowCount = Array.isArray(solutionRows) ? solutionRows.length : 0;
-  const passed = !userError && solutionResult && (
-    JSON.stringify(userRows) === JSON.stringify(solutionRows)
-  );
+  const passed = !userError && solutionResult && compareResultSets(userRows, solutionRows);
 
   // Simulated Otari Code Execution tool call payload
   const codeExecutionToolCall = {
@@ -239,7 +283,7 @@ async function handleCheckAnswer({
     container: 'auto',
     input: {
       language: 'python',
-      code: `# Otari Code Execution Container (auto-persisted)\nimport sqlite3, json\nconn = sqlite3.connect('/sandbox/db_explorer_seeded.db')\n\n# User Query\nuser_rows = conn.execute("""${userSql.replace(/"/g, '\\"')}""").fetchall()\n\n# Validation\nprint(f"Executed rows: {len(user_rows)}")`,
+      code: `# Otari Code Execution Container (auto-persisted)\nimport sqlite3, json\nconn = sqlite3.connect('/sandbox/db_explorer_seeded.db')\n\n# User Query\nuser_rows = conn.execute(${JSON.stringify(userSql)}).fetchall()\n\n# Validation\nprint(f"Executed rows: {len(user_rows)}")`,
     },
     output: {
       status: userError ? 'error' : 'success',

@@ -147,6 +147,12 @@ export default function LessonDetail() {
   const [tutorOpen, setTutorOpen] = useState(false);
 
   useEffect(() => {
+    const handler = () => setTutorOpen(prev => !prev);
+    window.addEventListener('toggle-tutor', handler);
+    return () => window.removeEventListener('toggle-tutor', handler);
+  }, []);
+
+  useEffect(() => {
     getLesson(id)
       .then(l => { setLesson(l); setLoading(false); })
       .catch(() => { setLesson(null); setLoading(false); });
@@ -458,8 +464,8 @@ export default function LessonDetail() {
           engine: lesson.engine,
           lessonId: lesson.id,
           lessonTitle: lesson.title,
-          currentSql: customQuery || (lesson.queries && lesson.queries[0]?.sql),
-          solutionSql: lesson.queries && lesson.queries[0]?.sql,
+          currentSql: customQuery || lesson.demo?.queries?.[0]?.sql || lesson.queries?.[0]?.sql || '',
+          solutionSql: lesson.demo?.queries?.[0]?.sql || lesson.queries?.[0]?.sql || '',
         }}
         onApplySql={(sql) => setCustomQuery(sql)}
       />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Coins, Clock, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 import { fetchUserBudget, resetTutorBudget } from '../utils/tutorApi';
 
@@ -6,6 +6,7 @@ export default function TutorCreditMeter({ onBudgetUpdate, refreshTrigger }) {
   const [budget, setBudget] = useState(null);
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const dropdownRef = useRef(null);
 
   async function loadBudget(exhaust = false) {
     try {
@@ -36,6 +37,18 @@ export default function TutorCreditMeter({ onBudgetUpdate, refreshTrigger }) {
     loadBudget();
   }, [refreshTrigger]);
 
+  // Click outside listener to dismiss dropdown
+  useEffect(() => {
+    if (!expanded) return;
+    function handleClickOutside(e) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setExpanded(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [expanded]);
+
   if (!budget) return null;
 
   const pct = Math.min(100, Math.max(0, (budget.remaining / budget.totalBudget) * 100));
@@ -43,7 +56,7 @@ export default function TutorCreditMeter({ onBudgetUpdate, refreshTrigger }) {
   const isExceeded = budget.isExceeded;
 
   return (
-    <div className="relative">
+    <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setExpanded(!expanded)}
         title="Otari Per-Learner Credit Budget"
@@ -61,7 +74,7 @@ export default function TutorCreditMeter({ onBudgetUpdate, refreshTrigger }) {
       </button>
 
       {expanded && (
-        <div className="absolute right-0 top-8 z-50 w-72 bg-gray-900 border border-gray-700 rounded-xl p-3.5 shadow-2xl text-xs space-y-3">
+        <div className="absolute right-0 top-8 z-50 w-72 max-w-[calc(100vw-2rem)] bg-gray-900 border border-gray-700 rounded-xl p-3.5 shadow-2xl text-xs space-y-3">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-white flex items-center gap-1.5">
               <Coins className="w-4 h-4 text-emerald-400" />

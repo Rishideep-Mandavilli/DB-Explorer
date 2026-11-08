@@ -4,15 +4,32 @@
  */
 
 const STORAGE_KEY = 'db_explorer_learner_id';
+let inMemoryLearnerId = null;
+
+function safeStorageGet(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return inMemoryLearnerId;
+  }
+}
+
+function safeStorageSet(key, val) {
+  try {
+    localStorage.setItem(key, val);
+  } catch {
+    inMemoryLearnerId = val;
+  }
+}
 
 /**
  * Returns or creates a persistent anonymous learner ID
  */
 export function getLearnerId() {
-  let id = localStorage.getItem(STORAGE_KEY);
+  let id = safeStorageGet(STORAGE_KEY);
   if (!id) {
     id = `learner_${Math.random().toString(36).substring(2, 9)}_${Date.now().toString(36)}`;
-    localStorage.setItem(STORAGE_KEY, id);
+    safeStorageSet(STORAGE_KEY, id);
   }
   return id;
 }
@@ -22,8 +39,43 @@ export function getLearnerId() {
  */
 export function resetLearnerId() {
   const newId = `learner_${Math.random().toString(36).substring(2, 9)}_${Date.now().toString(36)}`;
-  localStorage.setItem(STORAGE_KEY, newId);
+  safeStorageSet(STORAGE_KEY, newId);
   return newId;
+}
+
+/**
+ * Safely parse HTTP responses avoiding SyntaxErrors on HTML/non-JSON error bodies
+ */
+async function safeParseResponse(res, fallbackMessage) {
+  const contentType = res.headers.get('content-type') || '';
+  let data = {};
+
+  if (contentType.includes('application/json')) {
+    try {
+      data = await res.json();
+    } catch {
+      data = { error: 'Failed to parse JSON response from server' };
+    }
+  } else {
+    try {
+      const text = await res.text();
+      data = { error: text.slice(0, 300) || fallbackMessage };
+    } catch {
+      data = { error: fallbackMessage };
+    }
+  }
+
+  if (!res.ok) {
+    const error = new Error(data.error || fallbackMessage || `HTTP ${res.status}`);
+    error.status = res.status;
+    error.budgetExceeded = Boolean(data.budgetExceeded || res.status === 403);
+    error.resetTime = data.resetTime;
+    error.retryAfter = data.retryAfter;
+    error.data = data;
+    throw error;
+  }
+
+  return data;
 }
 
 /**
@@ -50,17 +102,7 @@ export async function sendTutorMessage({
     }),
   });
 
-  const data = await res.json();
-  if (!res.ok) {
-    const error = new Error(data.error || 'Failed to communicate with AI Tutor');
-    error.status = res.status;
-    error.budgetExceeded = Boolean(data.budgetExceeded);
-    error.resetTime = data.resetTime;
-    error.retryAfter = data.retryAfter;
-    error.data = data;
-    throw error;
-  }
-  return data;
+  return safeParseResponse(res, 'Failed to communicate with AI Tutor via Otari Gateway');
 }
 
 /**
@@ -83,11 +125,7 @@ export async function checkAnswerWithTutor({
     }),
   });
 
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.error || 'Failed to verify solution');
-  }
-  return data;
+  return safeParseResponse(res, 'Failed to verify solution');
 }
 
 /**
@@ -96,10 +134,7 @@ export async function checkAnswerWithTutor({
 export async function fetchUserBudget(exhaust = false) {
   const user = getLearnerId();
   const res = await fetch(`/api/tutor/budget?user=${encodeURIComponent(user)}${exhaust ? '&exhaust=true' : ''}`);
-  if (!res.ok) {
-    throw new Error('Failed to fetch tutor budget');
-  }
-  return res.json();
+  return safeParseResponse(res, 'Failed to fetch tutor budget');
 }
 
 /**
@@ -112,10 +147,7 @@ export async function resetTutorBudget() {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ user }),
   });
-  if (!res.ok) {
-    throw new Error('Failed to reset budget');
-  }
-  return res.json();
+  return safeParseResponse(res, 'Failed to reset budget');
 }
 
 /**
@@ -123,6 +155,5 @@ export async function resetTutorBudget() {
  */
 export async function fetchTutorHealth() {
   const res = await fetch('/api/tutor/health');
-  if (!res.ok) throw new Error('Failed to fetch tutor health');
-  return res.json();
+  return safeParseResponse(res, 'Failed to fetch tutor health');
 }

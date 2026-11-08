@@ -17,9 +17,10 @@ export default function TutorToolCallBadge({ toolCalls = [] }) {
             Otari Tools
           </span>
           {toolCalls.map((tc, idx) => {
+            const key = tc.id || idx;
             if (tc.type === 'otari_code_execution') {
               return (
-                <span key={idx} className="flex items-center gap-1 text-emerald-400 font-mono text-[11px]">
+                <span key={key} className="flex items-center gap-1 text-emerald-400 font-mono text-[11px]">
                   <Terminal className="w-3.5 h-3.5" />
                   <span>otari_code_execution (container: auto)</span>
                 </span>
@@ -27,7 +28,7 @@ export default function TutorToolCallBadge({ toolCalls = [] }) {
             }
             if (tc.type === 'otari_web_fetch') {
               return (
-                <span key={idx} className="flex items-center gap-1 text-sky-400 font-mono text-[11px]">
+                <span key={key} className="flex items-center gap-1 text-sky-400 font-mono text-[11px]">
                   <Globe className="w-3.5 h-3.5" />
                   <span>otari_web_fetch ({tc.request?.domain || 'official docs'})</span>
                 </span>
@@ -35,14 +36,14 @@ export default function TutorToolCallBadge({ toolCalls = [] }) {
             }
             if (tc.type === 'otari_web_search') {
               return (
-                <span key={idx} className="flex items-center gap-1 text-purple-400 font-mono text-[11px]">
+                <span key={key} className="flex items-center gap-1 text-purple-400 font-mono text-[11px]">
                   <Search className="w-3.5 h-3.5" />
                   <span>otari_web_search</span>
                 </span>
               );
             }
             return (
-              <span key={idx} className="text-gray-400 font-mono">
+              <span key={key} className="text-gray-400 font-mono">
                 {tc.type}
               </span>
             );
@@ -53,39 +54,50 @@ export default function TutorToolCallBadge({ toolCalls = [] }) {
 
       {expanded && (
         <div className="p-3 border-t border-gray-800/80 bg-gray-950/90 space-y-2.5 font-mono text-[11px]">
-          {toolCalls.map((tc, idx) => (
-            <div key={idx} className="space-y-1">
-              <div className="flex items-center justify-between text-gray-400">
-                <span className="text-white font-semibold flex items-center gap-1">
-                  <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                  {tc.type}
-                </span>
-                {tc.container && (
-                  <span className="text-[10px] px-1.5 py-0.2 bg-gray-800 text-gray-300 rounded">
-                    container: {tc.container}
+          {toolCalls.map((tc, idx) => {
+            const key = tc.id || idx;
+            return (
+              <div key={key} className="space-y-1">
+                <div className="flex items-center justify-between text-gray-400">
+                  <span className="text-white font-semibold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                    {tc.type}
                   </span>
+                  {tc.container && (
+                    <span className="text-[10px] px-1.5 py-0.2 bg-gray-800 text-gray-300 rounded">
+                      container: {tc.container}
+                    </span>
+                  )}
+                </div>
+
+                {tc.request?.url && (
+                  <div className="text-blue-400 truncate">
+                    URL: <a href={tc.request.url} target="_blank" rel="noreferrer" className="underline hover:text-blue-300">{tc.request.url}</a>
+                  </div>
+                )}
+
+                {tc.input?.code && (
+                  <div className="bg-gray-900 p-2 rounded text-gray-300 overflow-x-auto whitespace-pre">
+                    {tc.input.code}
+                  </div>
+                )}
+
+                {/* Documentation snippet from web fetch */}
+                {tc.response?.snippet && (
+                  <div className="bg-sky-950/30 p-2 rounded border border-sky-900/40 text-sky-200 text-[10px] space-y-1">
+                    <span className="text-sky-400 font-semibold block">{tc.response.title || 'Official Documentation'}</span>
+                    <p className="italic">"{tc.response.snippet}"</p>
+                  </div>
+                )}
+
+                {tc.output && (
+                  <div className="text-gray-400 text-[10px] bg-gray-900/60 p-1.5 rounded">
+                    Result: {typeof tc.output === 'object' ? JSON.stringify(tc.output) : tc.output}
+                  </div>
                 )}
               </div>
-
-              {tc.request?.url && (
-                <div className="text-blue-400 truncate">
-                  URL: <a href={tc.request.url} target="_blank" rel="noreferrer" className="underline hover:text-blue-300">{tc.request.url}</a>
-                </div>
-              )}
-
-              {tc.input?.code && (
-                <div className="bg-gray-900 p-2 rounded text-gray-300 overflow-x-auto whitespace-pre">
-                  {tc.input.code}
-                </div>
-              )}
-
-              {tc.output && (
-                <div className="text-gray-400 text-[10px]">
-                  Result: {typeof tc.output === 'object' ? JSON.stringify(tc.output) : tc.output}
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

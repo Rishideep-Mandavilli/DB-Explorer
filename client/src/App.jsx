@@ -124,13 +124,30 @@ function Footer() {
   );
 }
 
-export default function App() {
-  const [globalTutorOpen, setGlobalTutorOpen] = useState(false);
+function GlobalTutor() {
+  const location = useLocation();
+  const [open, setOpen] = useState(false);
+  const isContextualPage = location.pathname.startsWith('/lesson/') || location.pathname.startsWith('/sandbox');
 
+  useEffect(() => {
+    const handler = () => {
+      if (!isContextualPage) {
+        setOpen(prev => !prev);
+      }
+    };
+    window.addEventListener('toggle-tutor', handler);
+    return () => window.removeEventListener('toggle-tutor', handler);
+  }, [isContextualPage]);
+
+  if (isContextualPage) return null;
+  return <TutorPanel isOpen={open} onClose={() => setOpen(false)} context={{ engine: 'sqlite' }} />;
+}
+
+export default function App() {
   return (
     <BrowserRouter>
       <div className="min-h-screen flex flex-col">
-        <Nav onOpenTutor={() => setGlobalTutorOpen(prev => !prev)} />
+        <Nav onOpenTutor={() => window.dispatchEvent(new CustomEvent('toggle-tutor'))} />
         <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 py-8">
           <Routes>
             <Route path="/" element={<Lessons />} />
@@ -143,11 +160,7 @@ export default function App() {
           </Routes>
         </main>
         <Footer />
-        <TutorPanel
-          isOpen={globalTutorOpen}
-          onClose={() => setGlobalTutorOpen(false)}
-          context={{ engine: 'sqlite' }}
-        />
+        <GlobalTutor />
       </div>
     </BrowserRouter>
   );

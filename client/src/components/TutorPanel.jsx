@@ -21,6 +21,20 @@ import TutorCreditMeter from './TutorCreditMeter';
 import TutorToolCallBadge from './TutorToolCallBadge';
 import TutorDebugDrawer from './TutorDebugDrawer';
 
+function renderInlineMarkdown(text) {
+  if (!text) return null;
+  const parts = text.split(/(\*\*.*?\*\*|`.*?`)/g);
+  return parts.map((part, idx) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={idx} className="text-white font-semibold">{part.slice(2, -2)}</strong>;
+    }
+    if (part.startsWith('`') && part.endsWith('`')) {
+      return <code key={idx} className="px-1 py-0.5 rounded bg-gray-950 text-blue-300 font-mono text-[11px] border border-gray-800">{part.slice(1, -1)}</code>;
+    }
+    return part;
+  });
+}
+
 function FormattedContent({ content, onApplySql }) {
   if (!content) return null;
 
@@ -31,56 +45,63 @@ function FormattedContent({ content, onApplySql }) {
     <div className="space-y-2.5 text-xs leading-relaxed text-gray-200">
       {parts.map((part, i) => {
         if (part.startsWith('```')) {
-          const match = part.match(/```([a-z0-9_-]*)\n([\s\S]*?)```/);
-          const lang = match ? match[1] : 'sql';
-          const code = match ? match[2] : part.slice(3, -3);
+          const match = part.match(/^```([a-z0-9_-]*)\r?\n([\s\S]*?)(?:```)?$/);
+          const lang = match ? match[1].toLowerCase() : 'sql';
+          const rawCode = match ? match[2] : part.replace(/^```[a-z0-9_-]*\r?\n?/i, '').replace(/```$/, '');
+          const code = rawCode.trim();
+
+          const isApplicable = onApplySql && (
+            lang === 'sql' ||
+            lang === 'json' ||
+            /^\s*(SELECT|INSERT|UPDATE|DELETE|CREATE|DROP|ALTER|WITH|\{)/i.test(code)
+          );
 
           return (
             <div key={i} className="my-2 rounded-lg bg-gray-950 border border-gray-800 overflow-hidden font-mono text-[11px]">
               <div className="bg-gray-900/90 px-3 py-1.5 flex items-center justify-between border-b border-gray-800">
                 <span className="text-gray-400 font-semibold">{lang || 'code'}</span>
                 <div className="flex items-center gap-1.5">
-                  {onApplySql && (lang === 'sql' || code.toUpperCase().includes('SELECT')) && (
+                  {isApplicable && (
                     <button
-                      onClick={() => onApplySql(code.trim())}
+                      onClick={() => onApplySql(code)}
                       className="px-2 py-0.5 rounded bg-blue-600/20 text-blue-400 hover:bg-blue-600/40 border border-blue-500/30 text-[10px] flex items-center gap-1 transition-colors"
-                      title="Insert into query editor"
+                      title="Insert into editor"
                     >
                       <Play className="w-2.5 h-2.5" />
-                      Apply SQL
+                      Apply Code
                     </button>
                   )}
-                  <CopyCodeButton text={code.trim()} />
+                  <CopyCodeButton text={code} />
                 </div>
               </div>
               <pre className="p-3 text-blue-200 overflow-x-auto whitespace-pre leading-normal">
-                {code.trim()}
+                {code}
               </pre>
             </div>
           );
         }
 
         // Render markdown-like sections
-        const lines = part.split('\n');
+        const lines = part.split(/\r?\n/);
         return (
           <div key={i} className="space-y-1.5">
             {lines.map((line, lIdx) => {
               if (line.startsWith('### ')) {
-                return <h4 key={lIdx} className="text-white font-bold text-sm mt-2">{line.replace('### ', '')}</h4>;
+                return <h4 key={lIdx} className="text-white font-bold text-sm mt-2">{renderInlineMarkdown(line.replace('### ', ''))}</h4>;
               }
               if (line.startsWith('## ')) {
-                return <h3 key={lIdx} className="text-white font-bold text-base mt-2.5">{line.replace('## ', '')}</h3>;
+                return <h3 key={lIdx} className="text-white font-bold text-base mt-2.5">{renderInlineMarkdown(line.replace('## ', ''))}</h3>;
               }
               if (line.startsWith('- ') || line.startsWith('• ')) {
                 return (
                   <div key={lIdx} className="flex gap-1.5 pl-1">
                     <span className="text-blue-400">•</span>
-                    <span>{line.slice(2)}</span>
+                    <span>{renderInlineMarkdown(line.slice(2))}</span>
                   </div>
                 );
               }
               if (line.trim() === '') return <div key={lIdx} className="h-0.5" />;
-              return <p key={lIdx}>{line}</p>;
+              return <p key={lIdx}>{renderInlineMarkdown(line)}</p>;
             })}
           </div>
         );
@@ -91,12 +112,21 @@ function FormattedContent({ content, onApplySql }) {
 
 function CopyCodeButton({ text }) {
   const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
   return (
     <button
       onClick={() => {
         navigator.clipboard?.writeText(text);
         setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        timeoutRef.current = setTimeout(() => setCopied(false), 2000);
       }}
       className="p-1 rounded hover:bg-gray-800 text-gray-400 hover:text-white transition-colors"
       title="Copy code"
@@ -143,7 +173,7 @@ export default function TutorPanel({
   }, [messages, loading]);
 
   async function handleSend(textToSend = input, isCheckAnswer = false) {
-    const text = textToSend.trim();
+    const text = typeof textToSend === 'string' ? textToSend.trim() : '';
     if (!text && !isCheckAnswer) return;
 
     const userMessage = {
@@ -155,14 +185,13 @@ export default function TutorPanel({
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
-    setBudgetExceededState(null);
 
     try {
       if (isCheckAnswer) {
         // Otari Code Execution grading flow
         const result = await checkAnswerWithTutor({
           userSql: context.currentSql || '',
-          solutionSql: context.solutionSql || context.currentSql || '',
+          solutionSql: context.solutionSql || '',
           lessonId: context.lessonId,
         });
 
@@ -211,6 +240,7 @@ export default function TutorPanel({
         ]);
       }
     } catch (err) {
+      setBudgetRefresh(prev => prev + 1);
       if (err.budgetExceeded) {
         setBudgetExceededState(err);
         setMessages(prev => [
@@ -287,7 +317,14 @@ export default function TutorPanel({
         </div>
 
         <div className="flex items-center gap-1.5">
-          <TutorCreditMeter refreshTrigger={budgetRefresh} />
+          <TutorCreditMeter
+            refreshTrigger={budgetRefresh}
+            onBudgetUpdate={(b) => {
+              if (b && !b.isExceeded && budgetExceededState) {
+                setBudgetExceededState(null);
+              }
+            }}
+          />
 
           <button
             onClick={() => setDebugOpen(true)}
@@ -357,7 +394,7 @@ export default function TutorPanel({
                     </span>
                     {m.sources.map((s, sIdx) => (
                       <a
-                        key={sIdx}
+                        key={s.url || sIdx}
                         href={s.url}
                         target="_blank"
                         rel="noreferrer"
@@ -387,14 +424,16 @@ export default function TutorPanel({
       <div className="px-3 py-2 bg-gray-950/80 border-t border-gray-800 flex items-center gap-1.5 overflow-x-auto text-[11px] whitespace-nowrap scrollbar-none">
         <button
           onClick={() => handleSend('Why does LEFT JOIN return NULLs?')}
-          className="px-2.5 py-1 rounded-full bg-blue-900/30 text-blue-300 border border-blue-800/40 hover:bg-blue-800/40 transition-colors shrink-0"
+          disabled={loading}
+          className="px-2.5 py-1 rounded-full bg-blue-900/30 text-blue-300 border border-blue-800/40 hover:bg-blue-800/40 disabled:opacity-40 transition-colors shrink-0"
         >
           Why LEFT JOIN NULL?
         </button>
 
         <button
           onClick={() => handleSend('Write a query for top 3 customers by revenue')}
-          className="px-2.5 py-1 rounded-full bg-emerald-900/30 text-emerald-300 border border-emerald-800/40 hover:bg-emerald-800/40 transition-colors shrink-0"
+          disabled={loading}
+          className="px-2.5 py-1 rounded-full bg-emerald-900/30 text-emerald-300 border border-emerald-800/40 hover:bg-emerald-800/40 disabled:opacity-40 transition-colors shrink-0"
         >
           Top 3 Customers Query
         </button>
@@ -402,7 +441,8 @@ export default function TutorPanel({
         {context.currentSql && (
           <button
             onClick={() => handleSend('', true)}
-            className="px-2.5 py-1 rounded-full bg-purple-900/40 text-purple-300 border border-purple-700/50 hover:bg-purple-800/40 font-semibold transition-colors shrink-0 flex items-center gap-1"
+            disabled={loading}
+            className="px-2.5 py-1 rounded-full bg-purple-900/40 text-purple-300 border border-purple-700/50 hover:bg-purple-800/40 font-semibold disabled:opacity-40 transition-colors shrink-0 flex items-center gap-1"
           >
             <CheckCircle2 className="w-3 h-3" />
             Check My Answer
@@ -423,13 +463,13 @@ export default function TutorPanel({
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask Tutor (e.g. explain, write SQL)..."
-            disabled={loading}
-            className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500"
+            placeholder={budgetExceededState ? "Daily credit cap reached ($0.05). Resets at 00:00 UTC." : "Ask Tutor (e.g. explain, write SQL)..."}
+            disabled={loading || Boolean(budgetExceededState)}
+            className="flex-1 bg-gray-900 border border-gray-700 rounded-lg px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-blue-500 disabled:opacity-50"
           />
           <button
             type="submit"
-            disabled={loading || !input.trim()}
+            disabled={loading || !input.trim() || Boolean(budgetExceededState)}
             className="p-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:opacity-40 text-white transition-colors"
           >
             <Send className="w-3.5 h-3.5" />

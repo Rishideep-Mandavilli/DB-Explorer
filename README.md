@@ -202,4 +202,4 @@ db-explorer/
 
 ## License
 
-Educational use. Built for learning databases.
+MIT License — see [LICENSE](file:///LICENSE) for full details. Educational use for database learning.

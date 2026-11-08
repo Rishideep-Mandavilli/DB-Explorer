@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { isOtariConfigured, OTARI_BASE_URL, MODELS } = require('./otariClient');
 const { handleTutorChat, handleCheckAnswer } = require('./tutor');
-const { getUserBudget, recordUsage, resetUserBudget, DAILY_BUDGET_USD } = require('./budget');
+const { getUserBudget, reserveBudget, releaseBudget, recordUsage, resetUserBudget, DAILY_BUDGET_USD } = require('./budget');
 const { MCP_TOOLS, handleMcpToolCall } = require('./mcp');
 
 // Health and gateway status check
@@ -57,32 +57,47 @@ router.get('/budget', async (req, res) => {
 
 // Reset user budget (for demo & testing purposes)
 router.post('/budget/reset', async (req, res) => {
-  const userId = req.body.user || req.query.user || 'anonymous-learner';
-  const resetInfo = resetUserBudget(userId);
-  res.json({ ok: true, budget: resetInfo });
+  try {
+    const userId = (req.body && req.body.user) || req.query.user || 'anonymous-learner';
+    const resetInfo = await resetUserBudget(userId);
+    res.json({ ok: true, budget: resetInfo });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to reset user budget: ' + err.message });
+  }
 });
 
 // Main chat route for interactive AI tutor
 router.post('/chat', async (req, res) => {
+  const { message, context, user = 'anonymous-learner', modelOverride, simulateFallback, exhaustBudget } = req.body || {};
+
+  if (!message) {
+    return res.status(400).json({ error: 'Message is required' });
+  }
+
+  // 1. Enforce Per-Learner Budget Cap ($0.05/day)
+  const userBudget = await getUserBudget(user, Boolean(exhaustBudget));
+  if (userBudget.isExceeded) {
+    return res.status(403).json({
+      error: 'Daily tutor credit limit exceeded ($0.05/learner/day). Your credit will reset at midnight UTC.',
+      budgetExceeded: true,
+      resetTime: userBudget.resetTime,
+      retryAfter: userBudget.retryAfterSeconds || 86400,
+      budget: userBudget,
+    });
+  }
+
+  // 2. Atomically reserve estimated budget to prevent concurrency TOCTOU bypass
+  const reserved = reserveBudget(user, 0.002);
+  if (!reserved && !exhaustBudget) {
+    return res.status(403).json({
+      error: 'Daily tutor credit limit reached for this session. Your credit will reset at midnight UTC.',
+      budgetExceeded: true,
+      resetTime: userBudget.resetTime,
+      retryAfter: 86400,
+    });
+  }
+
   try {
-    const { message, context, user = 'anonymous-learner', modelOverride, simulateFallback, exhaustBudget } = req.body;
-
-    if (!message) {
-      return res.status(400).json({ error: 'Message is required' });
-    }
-
-    // 1. Enforce Per-Learner Budget Cap ($0.05/day)
-    const userBudget = await getUserBudget(user, Boolean(exhaustBudget));
-    if (userBudget.isExceeded) {
-      return res.status(403).json({
-        error: 'Daily tutor credit limit exceeded ($0.05/learner/day). Your credit will reset at midnight UTC.',
-        budgetExceeded: true,
-        resetTime: userBudget.resetTime,
-        retryAfter: userBudget.retryAfterSeconds || 86400,
-        budget: userBudget,
-      });
-    }
-
     const result = await handleTutorChat({
       message,
       context,
@@ -91,16 +106,19 @@ router.post('/chat', async (req, res) => {
       simulateFallback: Boolean(simulateFallback),
     });
 
-    // Record usage for learner
-    recordUsage(user, 0.002);
-
     res.json(result);
   } catch (error) {
+    // Release reserved credit on failed completion
+    releaseBudget(user, 0.002);
+
     console.error('Tutor Chat Error:', error);
-    const status = error.status || (error.message?.includes('budget') ? 403 : 500);
-    res.status(status).json({
+    const validStatus = Number.isInteger(error.status) && error.status >= 100 && error.status <= 599
+      ? error.status
+      : (error.message?.includes('budget') ? 403 : 500);
+
+    res.status(validStatus).json({
       error: error.message || 'Error communicating with AI Tutor via Otari Gateway',
-      budgetExceeded: status === 403,
+      budgetExceeded: validStatus === 403,
       retryAfter: error.headers?.['retry-after'] || '86400',
     });
   }
@@ -109,7 +127,7 @@ router.post('/chat', async (req, res) => {
 // Specialized grading route with otari_code_execution
 router.post('/check-answer', async (req, res) => {
   try {
-    const { userSql, solutionSql, lessonId, user = 'anonymous-learner' } = req.body;
+    const { userSql, solutionSql, lessonId, user = 'anonymous-learner' } = req.body || {};
 
     if (!userSql) {
       return res.status(400).json({ error: 'userSql is required' });
@@ -137,8 +155,11 @@ router.get('/mcp/tools', (req, res) => {
 });
 
 router.post('/mcp/call', async (req, res) => {
-  const { name, arguments: toolArgs } = req.body;
   try {
+    const { name, arguments: toolArgs } = req.body || {};
+    if (!name) {
+      return res.status(400).json({ error: 'Tool name is required' });
+    }
     const result = await handleMcpToolCall(name, toolArgs);
     res.json(result);
   } catch (error) {

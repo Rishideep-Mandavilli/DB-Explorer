@@ -8,9 +8,48 @@ const { OTARI_BASE_URL, isOtariConfigured } = require('./otariClient');
 
 const DAILY_BUDGET_USD = parseFloat(process.env.OTARI_DAILY_USER_BUDGET || '0.05');
 const RPM_LIMIT = 15;
+const MAX_LEDGER_ENTRIES = 5000;
 
-// Local ledger for development and fallback simulation
+// Bounded local ledger for development and fallback simulation
 const userLedger = new Map();
+
+/**
+ * Prunes the local ledger if it exceeds max size to prevent memory leaks
+ */
+function pruneLedgerIfNeeded() {
+  if (userLedger.size > MAX_LEDGER_ENTRIES) {
+    const keysToRemove = Array.from(userLedger.keys()).slice(0, 1000);
+    for (const key of keysToRemove) {
+      userLedger.delete(key);
+    }
+  }
+}
+
+/**
+ * Gets or initializes a local user ledger record with sliding-window RPM
+ */
+function getOrCreateRecord(userId) {
+  const now = Date.now();
+  if (!userLedger.has(userId)) {
+    pruneLedgerIfNeeded();
+    userLedger.set(userId, {
+      spend: 0.008, // Initial spend from preliminary exploration
+      requestsThisMinute: 0,
+      windowStart: now,
+      lastRequestTime: now,
+    });
+  }
+
+  const record = userLedger.get(userId);
+
+  // Sliding window: reset requestsThisMinute after 60 seconds
+  if (!record.windowStart || now - record.windowStart >= 60000) {
+    record.windowStart = now;
+    record.requestsThisMinute = 0;
+  }
+
+  return record;
+}
 
 /**
  * Calculates the next UTC midnight timestamp for budget resets
@@ -40,8 +79,8 @@ async function getUserBudget(userId = 'anonymous-learner', forceExhaust = false)
   // 1. Try querying Otari Gateway end-users API if configured
   if (isOtariConfigured() && !forceExhaust) {
     try {
-      const fetch = (await import('node-fetch')).default || global.fetch;
-      const res = await fetch(`${OTARI_BASE_URL}/end-users?external_id=${encodeURIComponent(userId)}`, {
+      const fetchFn = globalThis.fetch || (await import('node-fetch')).default;
+      const res = await fetchFn(`${OTARI_BASE_URL}/end-users?external_id=${encodeURIComponent(userId)}`, {
         headers: {
           Authorization: `Bearer ${process.env.OTARI_API_KEY}`,
           'Content-Type': 'application/json',
@@ -75,15 +114,7 @@ async function getUserBudget(userId = 'anonymous-learner', forceExhaust = false)
   }
 
   // 2. High-fidelity local simulation ledger
-  if (!userLedger.has(userId)) {
-    userLedger.set(userId, {
-      spend: 0.008, // Initial spend from preliminary queries
-      requestsThisMinute: 1,
-      lastRequestTime: Date.now(),
-    });
-  }
-
-  const record = userLedger.get(userId);
+  const record = getOrCreateRecord(userId);
 
   if (forceExhaust) {
     record.spend = DAILY_BUDGET_USD;
@@ -109,14 +140,35 @@ async function getUserBudget(userId = 'anonymous-learner', forceExhaust = false)
 }
 
 /**
+ * Atomically reserve budget before executing an LLM completion (avoids TOCTOU race condition)
+ */
+function reserveBudget(userId = 'anonymous-learner', estimatedCost = 0.002) {
+  const record = getOrCreateRecord(userId);
+  if (record.spend + estimatedCost > DAILY_BUDGET_USD) {
+    return false; // Insufficient credits
+  }
+  record.spend = parseFloat((record.spend + estimatedCost).toFixed(4));
+  record.requestsThisMinute += 1;
+  record.lastRequestTime = Date.now();
+  return true;
+}
+
+/**
+ * Release reserved budget if request fails or is rejected
+ */
+function releaseBudget(userId = 'anonymous-learner', amount = 0.002) {
+  if (userLedger.has(userId)) {
+    const record = userLedger.get(userId);
+    record.spend = Math.max(0, parseFloat((record.spend - amount).toFixed(4)));
+  }
+}
+
+/**
  * Record a completion's cost against the learner's budget
  */
 function recordUsage(userId = 'anonymous-learner', costUsd = 0.002) {
-  if (!userLedger.has(userId)) {
-    userLedger.set(userId, { spend: 0, requestsThisMinute: 0, lastRequestTime: Date.now() });
-  }
-  const record = userLedger.get(userId);
-  record.spend += costUsd;
+  const record = getOrCreateRecord(userId);
+  record.spend = parseFloat((record.spend + costUsd).toFixed(4));
   record.requestsThisMinute += 1;
   record.lastRequestTime = Date.now();
   return record;
@@ -125,13 +177,16 @@ function recordUsage(userId = 'anonymous-learner', costUsd = 0.002) {
 /**
  * Reset a user's simulated budget for live demo video purposes
  */
-function resetUserBudget(userId = 'anonymous-learner') {
-  userLedger.set(userId, { spend: 0.000, requestsThisMinute: 0, lastRequestTime: Date.now() });
-  return getUserBudget(userId);
+async function resetUserBudget(userId = 'anonymous-learner') {
+  const now = Date.now();
+  userLedger.set(userId, { spend: 0.000, requestsThisMinute: 0, windowStart: now, lastRequestTime: now });
+  return await getUserBudget(userId);
 }
 
 module.exports = {
   getUserBudget,
+  reserveBudget,
+  releaseBudget,
   recordUsage,
   resetUserBudget,
   DAILY_BUDGET_USD,
