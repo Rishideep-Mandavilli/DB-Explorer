@@ -18,7 +18,7 @@ export default function TutorDebugDrawer({
   const isFallback = forceFallback || latestHeaders['otari-fallback'] === 'true';
   const attempts = forceFallback ? '2' : (latestHeaders['otari-attempt-count'] || '1');
   const currentModel = forceFallback
-    ? 'qwen/qwen-2.5-coder-32b-instruct (backup)'
+    ? 'meta/llama-3.1-70b-instruct (backup)'
     : (latestHeaders['otari-model'] || 'tutor-sql (primary)');
 
   function handleResetId() {
@@ -48,7 +48,7 @@ export default function TutorDebugDrawer({
             Gateway Endpoint
           </span>
           <div className="bg-gray-900 p-2 rounded border border-gray-800 text-gray-300 select-all">
-            https://api.otari.ai/v1
+            https://otari.ai/api/v1
           </div>
         </div>
 

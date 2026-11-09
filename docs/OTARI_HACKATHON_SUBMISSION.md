@@ -17,8 +17,8 @@
 ## Feature Matrix & Evidence
 
 ### Open-Weight Models (30/30 pts)
-1. **Explainer Role (20 pts):** `google/gemma-2-9b-it` explains database internals, storage engines, and ACID properties in intuitive English.
-2. **SQL Coder Role (+10 pts):** `qwen/qwen-2.5-coder-32b-instruct` generates, refactors, and grades SQL queries.
+1. **Explainer Role (20 pts):** `google/gemma-3-12b-it` explains database internals, storage engines, and ACID properties in intuitive English.
+2. **SQL Coder Role (+10 pts):** `alibaba/qwen3-coder-30b-a3b-instruct` generates, refactors, and grades SQL queries.
 
 ### The 6 Core Otari Features (60/60 pts)
 1. **Multiple Models in Distinct Roles (10 pts):** Semantic router in `server/ai/tutor.js` directs conceptual queries ("explain / why / what is") to Gemma, and technical query requests ("write / fix / optimize") to Qwen Coder. Model badge in UI reflects the active responder.
@@ -26,7 +26,7 @@
 3. **Containerized Code Execution (10 pts):** Declares `{"type": "otari_code_execution"}` with `container: "auto"` to run and grade student queries against seeded SQLite database files in Python sqlite3 sandbox.
 4. **Official Documentation Web Fetch (10 pts):** Declares `{"type": "otari_web_fetch"}` constrained by `allowed_domains` to official database docs (`sqlite.org`, `postgresql.org`). Explainer responses cite pages as verified clickable source links.
 5. **Security & Prompt-Injection Guardrails (10 pts):** Enforces Otari input guardrail profile (`prompt-injection`, mode: block) plus an application-level AST/regex validator blocking destructive statements (`DROP`, `TRUNCATE`, unconstrained `DELETE`, `ATTACH`).
-6. **Per-User Credit Budgets (10 pts):** Sends anonymous learner ID in the `user` field with a service key bound to daily budget `bgt_learner_daily_05` ($0.05/learner/day). Displays live credit meter via `GET /api/v1/end-users` and gracefully handles HTTP 403 `budget_exceeded` with UTC reset countdowns.
+6. **Per-User Credit Budgets (10 pts):** Sends anonymous learner ID in the `user` field with a service key bound to daily budget `81dddbd4-c2e9-4174-963b-0f1754c59fa3` ($0.05/learner/day). Displays live credit meter via `GET /api/v1/end-users` and gracefully handles HTTP 403 `budget_exceeded` with UTC reset countdowns.
 
 ### Insurance Backup Features
 7. **Spending Ceilings:** Workspace and key daily ceiling cap ($10.00/day pool).
@@ -46,14 +46,14 @@
 2. **Flow A: Gemma Explainer & Web Fetch Doc Citations (0:40 - 1:30)**
    - Open Lesson 9: *SQL Deep Dive*.
    - Ask the AI Tutor: *"Why does LEFT JOIN return NULLs?"*
-   - Show the model badge: Gemma 2 9B answered.
+   - Show the model badge: Gemma 3 12B answered.
    - Point to the Otari Tool card: `otari_web_fetch` fetched `sqlite.org/lang_select.html`.
    - Point to the clickable source citations under the answer.
 
 3. **Flow B: Qwen SQL Coder & Containerized Code Execution (1:30 - 2:30)**
    - Switch to the Query Sandbox.
    - Ask: *"Write a query for top 3 customers by revenue."*
-   - Show the model badge: Qwen 2.5 Coder 32B answered.
+   - Show the model badge: Qwen3 Coder 30B answered.
    - Click **Apply SQL** into the editor and run it.
    - Click **Check My Answer**: show `otari_code_execution` firing with `container: "auto"`, comparing the result against the reference solution and passing with green checkmarks.
 
@@ -79,7 +79,7 @@
 *Format: Real webcam/screen recording with human voice sharing developer experience.*
 
 1. **What We Built & Which Features Worked (0:00 - 1:30)**
-   - Built a production AI Tutor using the standard `openai` npm SDK with `baseURL: "https://api.otari.ai/v1"`.
+   - Built a production AI Tutor using the standard `openai` npm SDK with `baseURL: "https://otari.ai/api/v1"`.
    - Loved the zero-friction drop-in replacement: no provider lock-in, effortless open-weight model swapping between Gemma and Qwen Coder.
    - The server-side tools (`otari_code_execution` and `otari_web_fetch`) are game-changers—avoiding complex custom sandbox infrastructure.
 
@@ -103,3 +103,11 @@
 
 ### 3. Would you keep using it?
 > *"Yes, absolutely. For educational platforms with anonymous public users, Otari's per-learner budget cap (`user` parameter + service key ceiling) is irreplaceable. It eliminates the financial liability of deploying LLMs on open websites while letting us effortlessly route between specialized open-weight models like Gemma and Qwen."*
+
+
+## Live setup notes (2026-11-09)
+- Base URL for hosted Otari: `https://otari.ai/api/v1`.
+- Models in use: Explainer `google/gemma-3-12b-it`; routing policy `tutor-sql` = primary `alibaba/qwen3-coder-30b-a3b-instruct`, backup `meta/llama-3.1-70b-instruct`; doc citations fetched with `meta/llama-3.1-70b-instruct` via `otari_web_fetch` (Gemma on hosted Otari does not emit tool calls).
+- Hosted Otari accepts only `{"type": ...}` on `otari_web_fetch` / `otari_code_execution` declarations; the allowed doc domains live in the workspace Web Access allowlist.
+- End-user budget: $0.05 per learner per day, resets at UTC midnight (5:30 AM IST).
+- Friction worth mentioning in the feedback video: the Gemma tool-call behaviour above, the type-only tool declarations (allowed_domains rejected with a 400), and budget ids not shown in the dashboard's budget list.

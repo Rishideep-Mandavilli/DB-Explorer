@@ -146,7 +146,7 @@ export default function TutorPanel({
     {
       id: 'welcome',
       role: 'tutor',
-      model: 'google/gemma-2-9b-it',
+      model: 'google/gemma-3-12b-it',
       roleTitle: 'Otari AI Tutor',
       content: `👋 **Welcome to DB Explorer AI Tutor!**\n\nI am connected directly through the **Mozilla Otari Gateway** with two specialized open-weight models:\n• **Gemma Explainer:** Clarifies core database concepts, internals, and cites official documentation.\n• **Qwen SQL Coder:** Writes queries, optimizes execution plans, and tests solutions using Otari containerized code execution.\n\nAsk any question or click one of the quick prompts below!`,
       toolCalls: [],
@@ -159,7 +159,7 @@ export default function TutorPanel({
   const [debugOpen, setDebugOpen] = useState(false);
   const [forceFallback, setForceFallback] = useState(false);
   const [latestHeaders, setLatestHeaders] = useState({
-    'otari-model': 'google/gemma-2-9b-it',
+    'otari-model': 'google/gemma-3-12b-it',
     'otari-fallback': 'false',
     'otari-attempt-count': '1',
   });
@@ -203,7 +203,7 @@ export default function TutorPanel({
           {
             id: 'tutor_' + Date.now(),
             role: 'tutor',
-            model: result.model || 'qwen/qwen-2.5-coder-32b-instruct',
+            model: result.model || 'alibaba/qwen3-coder-30b-a3b-instruct',
             roleTitle: 'Qwen SQL Grader',
             content: result.feedback,
             toolCalls: result.toolCalls || [],
@@ -230,7 +230,7 @@ export default function TutorPanel({
           {
             id: 'tutor_' + Date.now(),
             role: 'tutor',
-            model: result.model || 'google/gemma-2-9b-it',
+            model: result.model || 'google/gemma-3-12b-it',
             roleTitle: result.roleTitle || 'AI Tutor',
             content: result.reply,
             toolCalls: result.toolCalls || [],
@@ -311,7 +311,7 @@ export default function TutorPanel({
               </span>
             </div>
             <span className="text-[10px] text-gray-400 block font-mono truncate max-w-[140px]">
-              {latestHeaders['otari-model']?.split('/').pop() || 'gemma-2-9b'}
+              {latestHeaders['otari-model']?.split('/').pop() || 'gemma-3-12b'}
             </span>
           </div>
         </div>

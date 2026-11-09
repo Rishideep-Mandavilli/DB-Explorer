@@ -5,6 +5,35 @@
 
 ---
 
+## Recommended issue (reproduced live on hosted otari.ai, 2026-11-09)
+
+### Title
+`[BUG] google/gemma-3-12b-it and gemma-3-27b-it answer otari_web_fetch requests with tool_code text instead of a tool call`
+
+### Description
+On hosted Otari (served by Bedrock), a chat completion that declares `{"type": "otari_web_fetch"}` with `google/gemma-3-12b-it` or `google/gemma-3-27b-it` never produces a gateway tool call. The model replies with plain text such as:
+
+```
+```tool_code
+print(web_fetch(url='https://www.sqlite.org/lang_select.html'))
+```
+```
+
+`otari_tool_calls` is absent, so no fetch runs. The same request with `meta/llama-3.1-70b-instruct` returns `otari_tool_calls: [{"type": "web_fetch", "status": "completed", "url": "https://www.sqlite.org/lang_select.html"}]`.
+
+### Steps to reproduce
+1. POST `/api/v1/chat/completions` with `model: google/gemma-3-12b-it`, `tools: [{"type": "otari_web_fetch"}]`, and the message "Use web fetch on https://www.sqlite.org/lang_select.html and quote its first heading."
+2. Observe the `tool_code` text reply and no `otari_tool_calls`.
+3. Repeat with `meta/llama-3.1-70b-instruct`; the fetch completes.
+
+### Expected
+Either the catalog marks Gemma 3 offerings as not supporting tool calls (so a policy or the caller can avoid them), or the gateway rejects the tool declaration with a clear 400, rather than returning a 200 where the tool silently never runs.
+
+### Workaround in DB Explorer
+Gemma explains without tools; a second call to `meta/llama-3.1-70b-instruct` with `otari_web_fetch` fetches the official doc page for the citation chip.
+
+---
+
 ## Issue 1: Expose remaining user budget and reset headers directly on Chat Completion responses
 
 ### Title

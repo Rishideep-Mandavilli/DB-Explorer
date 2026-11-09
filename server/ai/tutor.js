@@ -88,7 +88,7 @@ async function handleTutorChat({
     selectedModel = modelOverride;
     roleTitle = 'Custom Model';
   } else if (intent === 'explain') {
-    selectedModel = MODELS.EXPLAINER; // Gemma (e.g. google/gemma-2-9b-it)
+    selectedModel = MODELS.EXPLAINER; // Gemma (e.g. google/gemma-3-12b-it)
     roleTitle = 'Gemma Explainer';
   } else {
     // SQL Coder: Use Otari routing policy or fallback model
@@ -98,8 +98,10 @@ async function handleTutorChat({
 
   // 3. Prepare tools based on role
   const tools = [];
+  // Explain: Gemma answers without tools (it can't emit tool calls on Otari);
+  // the doc citation is fetched separately by MODELS.DOCS (see fetchDocCitation).
   if (intent === 'explain') {
-    tools.push(OTARI_TOOLS.webFetch);
+    // no tools on the Gemma call
   } else if (intent === 'check_answer' || intent === 'sql_coder') {
     tools.push(OTARI_TOOLS.codeExecution);
   }
@@ -114,7 +116,8 @@ ${context.currentSql ? `Student's Active SQL:\n\`\`\`sql\n${context.currentSql}\
 Style:
 - Be clear, concise, and educational.
 - If explaining a concept, explain the mental model and fetch/cite official docs.
-- If writing SQL, provide high-performance, standard-compliant SQL with a quick explanation.`;
+- If writing SQL, provide high-performance, standard-compliant SQL with a quick explanation.
+- When you use the code execution tool, send plain Python source only (no markdown fences), using sqlite3 with an in-memory database.`;
 
   // 5. Call Otari Gateway if real API key configured
   if (isOtariConfigured() && !simulateFallback) {
@@ -137,15 +140,19 @@ Style:
         'x-request-id': responseObj.response.headers.get('x-request-id') || 'req-otari-' + Math.random().toString(36).substring(7),
       };
 
-      const toolCalls = completion.choices[0]?.message?.otari_tool_calls || [];
-      const sources = [];
+      // Otari returns gateway-run tool calls at the top level of the completion
+      const toolCalls = [
+        ...(completion.otari_tool_calls || []),
+        ...(completion.choices[0]?.message?.otari_tool_calls || []),
+      ];
+      const sources = extractSources(toolCalls);
 
-      // Extract sources if web_fetch was used
-      toolCalls.forEach(tc => {
-        if (tc.type === 'otari_web_fetch' && tc.response?.url) {
-          sources.push({ title: tc.response.title || 'Official Documentation', url: tc.response.url });
-        }
-      });
+      if (intent === 'explain') {
+        const docs = await fetchDocCitation(message, context, user);
+        toolCalls.push(...docs.toolCalls);
+        sources.push(...docs.sources);
+        if (docs.model) headers['otari-docs-model'] = docs.model;
+      }
 
       return {
         success: true,
@@ -177,6 +184,65 @@ Style:
     simulateFallback,
     startTime,
   });
+}
+
+/**
+ * Pulls official-doc sources out of Otari web_fetch tool calls
+ */
+function extractSources(toolCalls) {
+  const sources = [];
+  (toolCalls || []).forEach(tc => {
+    const isFetch = tc.type === 'web_fetch' || tc.type === 'otari_web_fetch';
+    const url = tc.url || tc.response?.url;
+    if (isFetch && url && tc.status !== 'failed') {
+      let host = 'Official Documentation';
+      try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (_) {}
+      sources.push({ title: tc.response?.title || host, url });
+    }
+  });
+  return sources;
+}
+
+/**
+ * Fetches one official documentation page for an explanation via otari_web_fetch,
+ * using a tool-capable open-weight model (MODELS.DOCS). Never throws.
+ */
+function pickDocUrl(message, engine) {
+  const m = (message || '').toLowerCase();
+  const e = (engine || 'sqlite').toLowerCase();
+  if (e.includes('postgres') || e.includes('supabase')) return 'https://www.postgresql.org/docs/current/queries.html';
+  if (e.includes('mysql')) return 'https://dev.mysql.com/doc/refman/8.4/en/select.html';
+  if (e.includes('mongo') || e.includes('firestore')) return 'https://www.mongodb.com/docs/manual/crud/';
+  if (e.includes('redis')) return 'https://redis.io/docs/latest/develop/data-types/';
+  if (/index/.test(m)) return 'https://www.sqlite.org/lang_createindex.html';
+  if (/transaction|acid|commit|rollback|isolation/.test(m)) return 'https://www.sqlite.org/lang_transaction.html';
+  if (/explain|query plan|optimi/.test(m)) return 'https://www.sqlite.org/eqp.html';
+  return 'https://www.sqlite.org/lang_select.html';
+}
+
+async function fetchDocCitation(message, context, user) {
+  try {
+    const url = pickDocUrl(message, context.engine);
+    const res = await otariClient.chat.completions.create({
+      model: MODELS.DOCS,
+      max_tokens: 150,
+      user,
+      tools: [OTARI_TOOLS.webFetch],
+      messages: [
+        { role: 'user', content: `Use web fetch on ${url} and reply with the page title only. (Context: a learner asked "${String(message).slice(0, 200)}")` },
+      ],
+    }).withResponse();
+    const data = res.data;
+    const toolCalls = data.otari_tool_calls || [];
+    return {
+      toolCalls,
+      sources: extractSources(toolCalls),
+      model: res.response.headers.get('otari-model') || MODELS.DOCS,
+    };
+  } catch (err) {
+    console.warn('Doc citation fetch failed:', err.message);
+    return { toolCalls: [], sources: [], model: null };
+  }
 }
 
 /**
@@ -422,7 +488,7 @@ LIMIT 3;
 - **Engine Tip:** Test this behavior in the Sandbox to see execution metrics in real-time.`;
   }
 
-  const modelHeader = simulateFallback ? MODELS.CODER_FALLBACK : (selectedModel === MODELS.CODER_POLICY ? 'qwen/qwen-2.5-coder-32b-instruct' : selectedModel);
+  const modelHeader = simulateFallback ? MODELS.CODER_FALLBACK : (selectedModel === MODELS.CODER_POLICY ? MODELS.CODER_DIRECT : selectedModel);
 
   return {
     success: true,

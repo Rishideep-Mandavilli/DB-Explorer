@@ -1,15 +1,20 @@
 const OpenAI = require('openai');
 require('dotenv').config();
 
-const OTARI_BASE_URL = process.env.OTARI_BASE_URL || 'https://api.otari.ai/v1';
+const OTARI_BASE_URL = process.env.OTARI_BASE_URL || 'https://otari.ai/api/v1';
 const OTARI_API_KEY = process.env.OTARI_API_KEY;
 
 // Official Otari Open-Weight Models & Routing Policies
 const MODELS = {
-  EXPLAINER: process.env.OTARI_EXPLAINER_MODEL || 'google/gemma-2-9b-it',
+  EXPLAINER: process.env.OTARI_EXPLAINER_MODEL || 'google/gemma-3-12b-it',
   CODER_POLICY: process.env.OTARI_CODER_MODEL || 'tutor-sql',
-  CODER_FALLBACK: process.env.OTARI_CODER_FALLBACK_MODEL || 'qwen/qwen-2.5-coder-32b-instruct',
-  CODER_DIRECT: 'qwen/qwen-2.5-coder-32b-instruct',
+  // Backup model configured in the tutor-sql routing policy (answers when the primary fails)
+  CODER_FALLBACK: process.env.OTARI_CODER_FALLBACK_MODEL || 'meta/llama-3.1-70b-instruct',
+  // Primary model inside the tutor-sql routing policy
+  CODER_DIRECT: process.env.OTARI_CODER_PRIMARY_MODEL || 'alibaba/qwen3-coder-30b-a3b-instruct',
+  // Doc fetcher: Gemma on Otari does not emit tool calls, so official-doc citations
+  // are fetched by a tool-capable open-weight model via otari_web_fetch.
+  DOCS: process.env.OTARI_DOCS_MODEL || 'meta/llama-3.1-70b-instruct',
 };
 
 // Create OpenAI client configured exclusively for the hosted Mozilla Otari Gateway
@@ -33,39 +38,17 @@ function isOtariConfigured() {
 /**
  * Tools available on the Mozilla Otari Gateway
  */
+// Otari gateway-run tools. Hosted Otari accepts only the `type` field on these
+// declarations; the allowed doc domains (sqlite.org, postgresql.org, dev.mysql.com,
+// mongodb.com, redis.io) are enforced by the workspace's Web Access allowlist.
 const OTARI_TOOLS = {
-  codeExecution: {
-    type: 'otari_code_execution',
-    otari_code_execution: {
-      container: 'auto',
-      timeout: 30,
-    },
-  },
-  webFetch: {
-    type: 'otari_web_fetch',
-    otari_web_fetch: {
-      allowed_domains: [
-        'sqlite.org',
-        'postgresql.org',
-        'dev.mysql.com',
-        'mongodb.com',
-        'redis.io',
-      ],
-    },
-  },
-  webSearch: {
-    type: 'otari_web_search',
-    otari_web_search: {
-      allowed_domains: [
-        'sqlite.org',
-        'postgresql.org',
-        'dev.mysql.com',
-        'mongodb.com',
-        'redis.io',
-      ],
-    },
-  },
+  codeExecution: { type: 'otari_code_execution' },
+  webFetch: { type: 'otari_web_fetch' },
+  webSearch: { type: 'otari_web_search' },
 };
+// Domains configured in the Otari workspace Web Access allowlist (for display/tests)
+const DOC_DOMAINS = ['sqlite.org', 'postgresql.org', 'dev.mysql.com', 'mongodb.com', 'redis.io'];
+
 
 module.exports = {
   otariClient,
@@ -73,4 +56,5 @@ module.exports = {
   OTARI_BASE_URL,
   MODELS,
   OTARI_TOOLS,
+  DOC_DOMAINS,
 };

@@ -28,13 +28,13 @@ router.get('/models', (req, res) => {
   res.json({
     explainer: {
       id: MODELS.EXPLAINER,
-      name: 'Gemma 2 9B Instruct',
+      name: 'Gemma 3 12B Instruct',
       type: 'open-weight',
       role: 'Explainer (Conceptual clarity, official doc citations)',
     },
     coder: {
       id: MODELS.CODER_POLICY,
-      name: 'Otari Policy: tutor-sql (Primary: Qwen Coder 32B)',
+      name: 'Otari Policy: tutor-sql (Primary: Qwen3 Coder 30B)',
       type: 'open-weight routing policy',
       role: 'SQL Coder (Query authoring, optimization, grading)',
       fallback: MODELS.CODER_FALLBACK,

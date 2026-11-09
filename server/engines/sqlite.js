@@ -2,6 +2,7 @@ const Database = require('better-sqlite3');
 const path = require('path');
 
 const DB_PATH = path.join(__dirname, '..', 'data', 'sqlite.db');
+require('fs').mkdirSync(path.dirname(DB_PATH), { recursive: true });
 let db;
 
 function getDb() {

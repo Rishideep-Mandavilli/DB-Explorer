@@ -4,7 +4,7 @@ A hands-on application for understanding databases through real queries, visual 
 
 ## AI Tutor powered by Mozilla Otari
 
-An intelligent, interactive AI Tutor embedded across all 30 lessons and the Query Sandbox, routed exclusively through the hosted **[Mozilla Otari Gateway](https://otari.ai)** (`https://api.otari.ai/v1`). All interactions leverage open-weight models with zero direct provider calls.
+An intelligent, interactive AI Tutor embedded across all 30 lessons and the Query Sandbox, routed exclusively through the hosted **[Mozilla Otari Gateway](https://otari.ai)** (`https://otari.ai/api/v1`). All interactions leverage open-weight models with zero direct provider calls.
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -30,7 +30,7 @@ An intelligent, interactive AI Tutor embedded across all 30 lessons and the Quer
 │  │  [server/ai/mcp.js]        Read-only engine MCP server (Backup)  │  │
 │  └─────────────────────────────────┬────────────────────────────────┘  │
 └────────────────────────────────────┼───────────────────────────────────┘
-                                     │ OpenAI SDK (baseURL: api.otari.ai)
+                                     │ OpenAI SDK (baseURL: otari.ai/api/v1)
                                      │ User ID: anonymous-learner-id
                                      ▼
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -47,8 +47,8 @@ An intelligent, interactive AI Tutor embedded across all 30 lessons and the Quer
               ▼                        ▼
 ┌────────────────────────────────────────────────────────────────────────┐
 │                    Catalog Open-Weight Models                          │
-│   • Explainer: google/gemma-2-9b-it (Concepts & Doc Citations)         │
-│   • SQL Coder: qwen/qwen-2.5-coder-32b-instruct (Queries & Grading)    │
+│   • Explainer: google/gemma-3-12b-it (Concepts & Doc Citations)         │
+│   • SQL Coder: alibaba/qwen3-coder-30b-a3b-instruct (Queries & Grading)    │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -56,7 +56,7 @@ An intelligent, interactive AI Tutor embedded across all 30 lessons and the Quer
 
 | # | Feature | Implementation Details | File Links |
 |---|---------|------------------------|------------|
-| **1** | **Multiple Open-Weight Models in Distinct Roles** | Intent-based routing. Explanations route to **Gemma 2 9B**, while query authoring/debugging routes to **Qwen 2.5 Coder 32B**. Active model displayed in UI badge. | [server/ai/tutor.js](file:///server/ai/tutor.js)<br>[client/src/components/TutorPanel.jsx](file:///client/src/components/TutorPanel.jsx) |
+| **1** | **Multiple Open-Weight Models in Distinct Roles** | Intent-based routing. Explanations route to **Gemma 3 12B**, while query authoring/debugging routes to **Qwen3 Coder 30B**. Active model displayed in UI badge. | [server/ai/tutor.js](file:///server/ai/tutor.js)<br>[client/src/components/TutorPanel.jsx](file:///client/src/components/TutorPanel.jsx) |
 | **2** | **Model Routing & Fallbacks** | Uses Otari routing policy `tutor-sql` with automatic fallback to secondary model. Inspects `Otari-Fallback` and `Otari-Attempt-Count` response headers in real-time debug drawer. | [server/ai/tutor.js](file:///server/ai/tutor.js)<br>[client/src/components/TutorDebugDrawer.jsx](file:///client/src/components/TutorDebugDrawer.jsx) |
 | **3** | **Containerized Code Execution** | Uses `{"type": "otari_code_execution"}` with `container: "auto"` for "Check my answer" requests. Compares student queries against reference solutions on seeded SQLite datasets. | [server/ai/tutor.js](file:///server/ai/tutor.js)<br>[client/src/components/TutorToolCallBadge.jsx](file:///client/src/components/TutorToolCallBadge.jsx) |
 | **4** | **Documentation Web Fetch** | Declares `{"type": "otari_web_fetch"}` with strict `allowed_domains` (`sqlite.org`, `postgresql.org`, `dev.mysql.com`, etc.). Explanations cite fetched documentation pages as clickable source links. | [server/ai/otariClient.js](file:///server/ai/otariClient.js)<br>[client/src/components/TutorPanel.jsx](file:///client/src/components/TutorPanel.jsx) |
@@ -75,12 +75,14 @@ cp .env.example .env
 
 `.env` configuration parameters:
 ```env
-OTARI_BASE_URL=https://api.otari.ai/v1
+OTARI_BASE_URL=https://otari.ai/api/v1
 OTARI_API_KEY=your_otari_virtual_key_here
-OTARI_EXPLAINER_MODEL=google/gemma-2-9b-it
+OTARI_EXPLAINER_MODEL=google/gemma-3-12b-it
 OTARI_CODER_MODEL=tutor-sql
-OTARI_CODER_FALLBACK_MODEL=qwen/qwen-2.5-coder-32b-instruct
-OTARI_BUDGET_ID=bgt_learner_daily_05
+OTARI_CODER_PRIMARY_MODEL=alibaba/qwen3-coder-30b-a3b-instruct
+OTARI_CODER_FALLBACK_MODEL=meta/llama-3.1-70b-instruct
+OTARI_DOCS_MODEL=meta/llama-3.1-70b-instruct
+OTARI_BUDGET_ID=81dddbd4-c2e9-4174-963b-0f1754c59fa3
 OTARI_DAILY_USER_BUDGET=0.05
 ```
 

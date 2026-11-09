@@ -51,7 +51,7 @@ async function runTestSuite() {
     });
 
     assert.strictEqual(res.success, true);
-    assert.strictEqual(res.model, 'google/gemma-2-9b-it');
+    assert.strictEqual(res.model, 'google/gemma-3-12b-it');
     assert.ok(res.reply.includes('LEFT JOIN'));
     assert.ok(res.toolCalls.some(tc => tc.type === 'otari_web_fetch'));
     assert.ok(res.sources.length >= 1);
@@ -171,7 +171,7 @@ async function runTestSuite() {
     assert.strictEqual(res.success, true);
     assert.strictEqual(res.headers['otari-fallback'], 'true');
     assert.strictEqual(res.headers['otari-attempt-count'], '2');
-    assert.ok(res.model.includes('qwen-2.5-coder-32b-instruct'));
+    assert.ok(res.model.includes('llama-3.1-70b-instruct'));
   });
 
   // --- Feature 6 & Flow E: Per-User Budget Tracking and 403 Refusal ---
